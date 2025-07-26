@@ -26,8 +26,14 @@ import com.sabarno.Chat_O_Mania.entity.Chats;
 import com.sabarno.Chat_O_Mania.repository.ChatRepository;
 import com.sabarno.Chat_O_Mania.service.IMessageService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @RestController
 @RequestMapping("/api/messages")
+@Tag(name = "CRUD REST APIs for Messages of Chat-O-Mania", description = "APIs for managing messages in chats")
 public class MessageController {
 
   @Autowired
@@ -39,12 +45,26 @@ public class MessageController {
   @Autowired
   private ChatRepository chatRepository;
 
+  @Operation(summary = "Get all messages in a chat", description = "Fetches all messages for a given chat ID.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully retrieved messages"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid chat ID"),
+      @ApiResponse(responseCode = "404", description = "Chat not found with the provided ID"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @GetMapping("/")
   public ResponseEntity<List<MessageDto>> getAllMessages(@RequestParam UUID chatId) {
     List<MessageDto> messages = messageService.getAllMessages(chatId);
     return ResponseEntity.ok(messages);
   }
 
+  @Operation(summary = "Send a message", description = "Sends a message in a chat and notifies recipients.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Message sent successfully"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid message data or chat ID"),
+      @ApiResponse(responseCode = "500", description = "Internal server error - Failed to send message"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @PostMapping(value = "/", consumes = "multipart/form-data")
   public ResponseEntity<Boolean> sendMessage(@ModelAttribute SendMessageRequestDto request, Principal principal) {
     UUID senderId = UUID.fromString(principal.getName());
@@ -74,6 +94,13 @@ public class MessageController {
     return ResponseEntity.ok(true);
   }
 
+  @Operation(summary = "Edit a message", description = "Allows the sender to edit their message within 5 minutes of sending.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Message edited successfully"),
+      @ApiResponse(responseCode = "403", description = "Forbidden - Only sender can edit within 5 minutes"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid message data or chat ID"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @PutMapping("/edit")
   public ResponseEntity<?> editMessage(@RequestBody EditMessageRequestDto request, Principal principal) {
     UUID senderId = UUID.fromString(principal.getName());
@@ -85,6 +112,13 @@ public class MessageController {
     }
   }
 
+  @Operation(summary = "Delete a message", description = "Allows the sender to delete their message.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Message deleted successfully"),
+      @ApiResponse(responseCode = "404", description = "Message not found or not sent by the user"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid message data or chat ID"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @DeleteMapping("/delete")
   public ResponseEntity<Boolean> deleteMessage(@RequestBody DeleteMessageRequestDto request, Principal principal) {
     UUID senderId = UUID.fromString(principal.getName());

@@ -25,28 +25,57 @@ import com.sabarno.Chat_O_Mania.dto.UserDto;
 import com.sabarno.Chat_O_Mania.entity.User;
 import com.sabarno.Chat_O_Mania.service.IUserService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "CRUD REST APIs for User Management in Chat-O-Mania", description = "APIs for managing user accounts, profiles, and authentication")
 public class UserController {
 
   @Autowired
   private IUserService userService;
 
+  @Operation(summary = "Get all users", description = "Fetches a list of all registered users.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully retrieved all users"),
+      @ApiResponse(responseCode = "500", description = "Internal server error")
+  })
   @GetMapping("/users")
   public ResponseEntity<List<User>> allUsers() {
     return ResponseEntity.ok(userService.getAllUsers());
   }
 
+  @Operation(summary = "Register a new user", description = "Registers a new user with the provided details.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully registered user"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid input data"),
+      @ApiResponse(responseCode = "409", description = "Conflict - User already exists with the provided email")
+  })
   @PostMapping("/register")
   public ResponseEntity<UserDto> registerUser(@RequestBody RegisterRequestDto user) {
     return ResponseEntity.ok(userService.registerUser(user));
   }
 
+  @Operation(summary = "User login", description = "Authenticates a user and returns a login response.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully logged in user"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid credentials"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Missing or invalid input data")
+  })
   @PostMapping("/login")
   public ResponseEntity<LoginResponseDto> loginUser(@RequestBody LoginRequestDto loginRequest) {
     return ResponseEntity.ok(userService.loginUser(loginRequest.getEmail(), loginRequest.getPassword()));
   }
 
+  @Operation(summary = "Update user details", description = "Updates the details of the currently logged-in user.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully updated user details"),
+      @ApiResponse(responseCode = "403", description = "Forbidden - User is not authorized to update this account"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid input data")
+  })
   @PutMapping("/update")
   public ResponseEntity<UserDto> updateUser(@RequestBody UpdateUserDto user, Principal principal) {
     if (principal == null || !principal.getName().equals(user.getUsername())) {
@@ -55,6 +84,12 @@ public class UserController {
     return ResponseEntity.ok(userService.updateUser(user, UUID.fromString(principal.getName())));
   }
 
+  @Operation(summary = "Update user password", description = "Updates the password of the currently logged-in user.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully updated user password"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid current password or new password"),
+      @ApiResponse(responseCode = "403", description = "Forbidden - User is not authorized to update this account")
+  })
   @PutMapping("/updatepassword")
   public ResponseEntity<String> updatePassword(@RequestBody UpdatePasswordRequestDto requestDto, Principal principal) {
     UUID userId = UUID.fromString(principal.getName());
@@ -66,6 +101,12 @@ public class UserController {
     }
   }
 
+  @Operation(summary = "Upload profile picture", description = "Uploads a new profile picture for the currently logged-in user.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully uploaded profile picture"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid file format or size"),
+      @ApiResponse(responseCode = "500", description = "Internal server error - Failed to upload profile picture")
+  })
   @PutMapping("/upload-profile-picture")
   public ResponseEntity<String> uploadProfilePicture(
       @RequestBody MultipartFile file,
@@ -79,6 +120,11 @@ public class UserController {
     }
   }
 
+  @Operation(summary = "Get user profile", description = "Fetches the profile details of the currently logged-in user.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully retrieved user profile"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @GetMapping("/profile")
   public ResponseEntity<ProfileDto> getUserProfile(Principal principal) {
     if (principal == null) {
@@ -89,6 +135,11 @@ public class UserController {
     return ResponseEntity.ok(userProfile);
   }
 
+  @Operation(summary = "Add bio", description = "Updates the bio of the currently logged-in user.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully updated bio"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @PostMapping("/addbio")
   public ResponseEntity<String> addBio(@RequestBody String bio, Principal principal) {
     if (principal == null) {
@@ -99,6 +150,11 @@ public class UserController {
     return ResponseEntity.ok("Bio updated successfully.");
   }
 
+  @Operation(summary = "Get friends list", description = "Fetches the list of friends for the currently logged-in user.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully retrieved friends list"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @GetMapping("/friends")
   public ResponseEntity<List<UserDto>> getFriends(Principal principal) {
     if (principal == null) {
@@ -109,6 +165,12 @@ public class UserController {
     return ResponseEntity.ok(friends);
   }
 
+  @Operation(summary = "Search users", description = "Searches for users based on a query string.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully retrieved list of users matching the search query"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid search query"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @GetMapping("/search")
   public ResponseEntity<List<UserDto>> searchUsers(String query, Principal principal) {
     if (principal == null) {
@@ -119,6 +181,13 @@ public class UserController {
     return ResponseEntity.ok(users);
   }
 
+  @Operation(summary = "Remove a friend", description = "Removes a friend from the currently logged-in user's friends list.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully removed friend"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid request parameters or trying to remove self"),
+      @ApiResponse(responseCode = "404", description = "Friend not found in the user's friends list"),
+      @ApiResponse(responseCode = "500", description = "Internal server error - Failed to remove friend")
+  })
   @DeleteMapping("/removefriend")
   public ResponseEntity<String> removeFriend(UUID friendId, Principal principal) {
     if (principal == null || friendId == null) {
