@@ -7,9 +7,11 @@ import com.sabarno.Chat_O_Mania.entity.Message;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class ChatDto {
 
   private UUID chatId;
