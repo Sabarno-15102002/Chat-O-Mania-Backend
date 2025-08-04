@@ -20,6 +20,9 @@ import com.sabarno.Chat_O_Mania.dto.UpdatePasswordRequestDto;
 import com.sabarno.Chat_O_Mania.dto.UpdateUserDto;
 import com.sabarno.Chat_O_Mania.dto.UserDto;
 import com.sabarno.Chat_O_Mania.entity.User;
+import com.sabarno.Chat_O_Mania.exception.NotValidDataException;
+import com.sabarno.Chat_O_Mania.exception.ResourceNotFoundException;
+import com.sabarno.Chat_O_Mania.mapper.UserMapper;
 import com.sabarno.Chat_O_Mania.repository.UserRepository;
 import com.sabarno.Chat_O_Mania.service.IUserService;
 
@@ -56,37 +59,26 @@ public class UserServiceImpl implements IUserService {
     user.setIsAdmin(request.getIsAdmin() != null ? request.getIsAdmin() : false);
 
     User savedUser = userRepository.save(user);
-    return new UserDto(
-        savedUser.getId(),
-        savedUser.getUsername(),
-        savedUser.getEmail(),
-        savedUser.getMobileNumber(),
-        savedUser.getIsAdmin());
+    return UserMapper.mapToUserDto(savedUser, new UserDto());
   }
 
   @Override
   public LoginResponseDto loginUser(String email, String password) {
     User user = userRepository.findByEmail(email)
-        .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+        .orElseThrow(() -> new NotValidDataException("Invalid email or password"));
 
     if (!passwordEncoder.matches(password, user.getPassword())) {
-      throw new RuntimeException("Invalid email or password");
+      throw new NotValidDataException("Invalid email or password");
     }
 
     String token = jwtService.generateToken(user.getId().toString());
-    return new LoginResponseDto(
-        user.getId(),
-        user.getUsername(),
-        user.getEmail(),
-        user.getMobileNumber(),
-        user.getIsAdmin(),
-        token);
+    return UserMapper.mapToLoginResponseDto(user, new LoginResponseDto(), token);
   }
 
   @Override
   public UserDto updateUser(UpdateUserDto user, UUID userId) {
     User existingUser = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
     if (user.getUsername() != null) {
       existingUser.setUsername(user.getUsername());
@@ -99,21 +91,16 @@ public class UserServiceImpl implements IUserService {
     }
 
     User updatedUser = userRepository.save(existingUser);
-    return new UserDto(
-        updatedUser.getId(),
-        updatedUser.getUsername(),
-        updatedUser.getEmail(),
-        updatedUser.getMobileNumber(),
-        updatedUser.getIsAdmin());
+    return UserMapper.mapToUserDto(updatedUser, new UserDto());
   }
 
   @Override
   public boolean updatePassword(UUID userId, UpdatePasswordRequestDto requestDto) {
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
     if (!passwordEncoder.matches(requestDto.getOldPassword(), user.getPassword())) {
-      throw new RuntimeException("Old password is incorrect.");
+      throw new NotValidDataException("Old password is incorrect.");
     }
 
     user.setPassword(passwordEncoder.encode(requestDto.getNewPassword()));
@@ -126,13 +113,13 @@ public class UserServiceImpl implements IUserService {
   public Instant getLastSeen(UUID id) {
     return userRepository.findById(id)
         .map(User::getLastSeen)
-        .orElseThrow(() -> new RuntimeException("User not found with ID: " + id));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
   }
 
   @SuppressWarnings("unchecked")
   public void updateProfilePicture(UUID userId, MultipartFile file) {
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
     try {
       // Delete old profile picture if it exists
@@ -142,7 +129,7 @@ public class UserServiceImpl implements IUserService {
 
       // Upload new picture using preset
       if (file.isEmpty()) {
-        throw new RuntimeException("File is empty");
+        throw new NotValidDataException("File is empty");
       }
 
       Map<String, Object> options = ObjectUtils.asMap(
@@ -165,20 +152,18 @@ public class UserServiceImpl implements IUserService {
   @Override
   public ProfileDto getUserProfile(UUID userId) {
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
-    return new ProfileDto(user.getId(), user.getUsername(), user.getEmail(),
-        user.getMobileNumber(), user.getLastSeen(), user.getProfilePicUrl(),
-        user.getProfilePicPublicId(), user.getBio());
+    return UserMapper.mapToProfileDto(user, new ProfileDto());
   }
 
   @Override
   public void addBio(UUID userId, String bio) {
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
     if (bio == null || bio.isBlank()) {
-      throw new RuntimeException("Bio cannot be empty");
+      throw new NotValidDataException("Bio cannot be empty");
     }
 
     user.setBio(bio);
@@ -188,46 +173,36 @@ public class UserServiceImpl implements IUserService {
   @Override
   public List<UserDto> getFriends(UUID userId) {
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
     return user.getFriends().stream()
-        .map(friend -> new UserDto(
-            friend.getId(),
-            friend.getUsername(),
-            friend.getEmail(),
-            friend.getMobileNumber(),
-            friend.getIsAdmin()))
+        .map(friend -> UserMapper.mapToUserDto(friend, new UserDto()))
         .toList();
   }
 
   @Override
   public List<UserDto> searchUsers(String query, UUID userId) {
     if (query == null || query.isBlank()) {
-      throw new RuntimeException("Search query cannot be empty");
+      throw new NotValidDataException("Search query cannot be empty");
     }
 
     List<User> users = userRepository.findByUsernameContainingIgnoreCase(query);
     
     return users.stream()
         .filter(user -> !user.getId().equals(userId)) // Exclude the current user
-        .map(user -> new UserDto(
-            user.getId(),
-            user.getUsername(),
-            user.getEmail(),
-            user.getMobileNumber(),
-            user.getIsAdmin()))
+        .map(user -> UserMapper.mapToUserDto(user, new UserDto()))
         .toList();
   }
 
   @Override
   public boolean removeFriend(UUID userId, UUID friendId) {
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
     User friend = userRepository.findById(friendId)
-        .orElseThrow(() -> new RuntimeException("Friend not found with ID: " + friendId));
+        .orElseThrow(() -> new ResourceNotFoundException("Friend not found with ID: " + friendId));
 
     if (!user.getFriends().contains(friend)) {
-      throw new RuntimeException("Friend not found in user's friend list");
+      throw new ResourceNotFoundException("Friend not found in user's friend list");
     }
 
     user.getFriends().remove(friend);

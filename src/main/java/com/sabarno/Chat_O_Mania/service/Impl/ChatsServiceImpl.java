@@ -18,6 +18,12 @@ import com.sabarno.Chat_O_Mania.dto.UserDto;
 import com.sabarno.Chat_O_Mania.entity.Chats;
 import com.sabarno.Chat_O_Mania.entity.Message;
 import com.sabarno.Chat_O_Mania.entity.User;
+import com.sabarno.Chat_O_Mania.exception.GroupChatOperationException;
+import com.sabarno.Chat_O_Mania.exception.NotGroupChatException;
+import com.sabarno.Chat_O_Mania.exception.NotValidDataException;
+import com.sabarno.Chat_O_Mania.exception.ResourceNotFoundException;
+import com.sabarno.Chat_O_Mania.mapper.ChatMapper;
+import com.sabarno.Chat_O_Mania.mapper.UserMapper;
 import com.sabarno.Chat_O_Mania.repository.ChatRepository;
 import com.sabarno.Chat_O_Mania.repository.UserRepository;
 import com.sabarno.Chat_O_Mania.service.IChatsService;
@@ -45,7 +51,7 @@ public class ChatsServiceImpl implements IChatsService {
 
           for (Message latestMessage : latestMessageList) {
             if (latestMessage != null && latestMessage.getSender() != null) {
-              User sender = userRepository.findById(latestMessage.getSender().getId()).orElse(null);
+              User sender = userRepository.findById(latestMessage.getSender().getId()).orElseThrow();
               if (sender != null) {
                 latestMessage.setSender(sender);
               }
@@ -63,15 +69,8 @@ public class ChatsServiceImpl implements IChatsService {
                   user.getIsAdmin()))
               .collect(Collectors.toList());
 
-          return new FetchChatDto(
-              chat.getId(),
-              chat.getChatName(),
-              chat.getIsGroupChat(),
-              userDtos,
-              latestMessageList,
-              groupAdminDtos);
-        })
-        .collect(Collectors.toList());
+          return ChatMapper.mapToFetchChatDto(chat, new FetchChatDto(), userDtos, latestMessageList, groupAdminDtos);
+        }).collect(Collectors.toList());
 
     return chatList;
   }
@@ -84,14 +83,13 @@ public class ChatsServiceImpl implements IChatsService {
       if (!chats.isEmpty()) {
         Chats chat = chats.get(0);
         List<User> users = chat.getUsers();
-         userDtos = users.stream()
-            .map(user -> new UserDto(user.getId(), user.getUsername(), user.getEmail(), user.getMobileNumber(),
-                user.getIsAdmin()))
+        userDtos = users.stream()
+            .map(user -> UserMapper.mapToUserDto(user, new UserDto()))
             .toList();
       }
 
-      User user1 = userRepository.findById(requestingUserId).orElseThrow();
-      User user2 = userRepository.findById(targetUserId.getTargetUserId()).orElseThrow();
+      User user1 = userRepository.findById(requestingUserId).orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + requestingUserId));
+      User user2 = userRepository.findById(targetUserId.getTargetUserId()).orElseThrow(() -> new ResourceNotFoundException("Target user not found with ID: " + targetUserId.getTargetUserId()));
 
       Chats newChat = new Chats();
       newChat.setChatName("sender");
@@ -102,11 +100,9 @@ public class ChatsServiceImpl implements IChatsService {
 
       List<User> users = newChat.getUsers();
       userDtos = users.stream()
-          .map(user -> new UserDto(user.getId(), user.getUsername(), user.getEmail(), user.getMobileNumber(),
-              user.getIsAdmin()))
+          .map(user -> UserMapper.mapToUserDto(user, new UserDto()))
           .toList();
-      return new ChatDto(newChat.getId(), newChat.getChatName(), newChat.getIsGroupChat(), userDtos,
-          newChat.getLatestMessages());
+      return ChatMapper.mapToChatDto(newChat, new ChatDto(), userDtos);
     } catch (Exception e) {
       e.printStackTrace();
       throw new RuntimeException("Error accessing chat: " + e.getMessage());
@@ -117,18 +113,18 @@ public class ChatsServiceImpl implements IChatsService {
   public Chats createGroupChat(CreateGroupDto dto, UUID adminUuid) {
     try {
       if (dto.getUserIds() == null || dto.getChatName() == null || dto.getUserIds().isEmpty()) {
-        throw new IllegalArgumentException("Please fill all the fields");
+        throw new NotValidDataException("Please fill all the fields");
       }
 
       if (dto.getUserIds().size() < 2) {
-        throw new IllegalArgumentException("More than 2 users are required to form a group chat");
+        throw new NotValidDataException("More than 2 users are required to form a group chat");
       }
       List<User> users = userRepository.findAllById(dto.getUserIds());
       if (users.size() != dto.getUserIds().size()) {
-        throw new IllegalArgumentException("Some users not found");
+        throw new NotValidDataException("Some users not found");
       }
       User admin = userRepository.findById(adminUuid)
-          .orElseThrow(() -> new RuntimeException("Admin user not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("Admin user not found"));
 
       users.add(admin);
 
@@ -144,24 +140,24 @@ public class ChatsServiceImpl implements IChatsService {
       return savedChat;
     } catch (Exception e) {
       e.printStackTrace();
-      throw new RuntimeException("Error Creating Group" + e.getMessage());
+      throw new GroupChatOperationException("Error Creating Group" + e.getMessage());
     }
   }
 
   @Override
   public Boolean renameGroupChat(UUID chatId, String newName, UUID adminUuid) {
     if (newName == null || newName.isEmpty()) {
-      throw new IllegalArgumentException("Chat name cannot be empty");
+      throw new NotValidDataException("Chat name cannot be empty");
     }
     try {
       Chats chat = chatRepository.findById(chatId)
-          .orElseThrow(() -> new RuntimeException("Chat not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
 
       if (!chat.getGroupAdmins().stream().anyMatch(admin -> admin.getId().equals(adminUuid))) {
         return false; // Not an admin
       }
       if (!chat.getIsGroupChat()) {
-        throw new RuntimeException("This is not a group chat");
+        throw new NotGroupChatException("This is not a group chat");
       }
 
       chat.setChatName(newName);
@@ -169,7 +165,7 @@ public class ChatsServiceImpl implements IChatsService {
       return true;
     } catch (Exception e) {
       e.printStackTrace();
-      throw new RuntimeException("Error renaming group chat: " + e.getMessage());
+      throw new GroupChatOperationException("Error renaming group chat: " + e.getMessage());
     }
   }
 
@@ -177,18 +173,18 @@ public class ChatsServiceImpl implements IChatsService {
   public Boolean addToGroupChat(UUID chatId, UUID userId, UUID adminUuid) {
     try {
       Chats chat = chatRepository.findById(chatId)
-          .orElseThrow(() -> new RuntimeException("Chat not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
 
       if (!chat.getIsGroupChat()) {
-        throw new RuntimeException("This is not a group chat");
+        throw new NotGroupChatException("This is not a group chat");
       }
       if (!chat.getGroupAdmins().stream().anyMatch(admin -> admin.getId().equals(adminUuid))) {
         return false; // Not an admin
       }
       User user = userRepository.findById(userId)
-          .orElseThrow(() -> new RuntimeException("User not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("User not found"));
       if (chat.getUsers().contains(user)) {
-        throw new RuntimeException("User already exists in the group chat");
+        throw new GroupChatOperationException("User already exists in the group chat");
       }
 
       chat.getUsers().add(user);
@@ -196,7 +192,7 @@ public class ChatsServiceImpl implements IChatsService {
       return true;
     } catch (Exception e) {
       e.printStackTrace();
-      throw new RuntimeException("Error adding to group chat: " + e.getMessage());
+      throw new GroupChatOperationException("Error adding to group chat: " + e.getMessage());
     }
   }
 
@@ -204,18 +200,18 @@ public class ChatsServiceImpl implements IChatsService {
   public Boolean removeFromGroupChat(UUID chatId, UUID userId, UUID adminUuid) {
     try {
       Chats chat = chatRepository.findById(chatId)
-          .orElseThrow(() -> new RuntimeException("Chat not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
 
       if (!chat.getIsGroupChat()) {
-        throw new RuntimeException("This is not a group chat");
+        throw new NotGroupChatException("This is not a group chat");
       }
       if (!chat.getGroupAdmins().stream().anyMatch(admin -> admin.getId().equals(adminUuid))) {
         return false; // Not an admin
       }
       User user = userRepository.findById(userId)
-          .orElseThrow(() -> new RuntimeException("User not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("User not found"));
       if (!chat.getUsers().contains(user)) {
-        throw new RuntimeException("User does not in the group chat");
+        throw new ResourceNotFoundException("User is not present in the group chat");
       }
 
       chat.getUsers().remove(user);
@@ -224,7 +220,7 @@ public class ChatsServiceImpl implements IChatsService {
       return true;
     } catch (Exception e) {
       e.printStackTrace();
-      throw new RuntimeException("Error adding to group chat: " + e.getMessage());
+      throw new GroupChatOperationException("Error adding to group chat: " + e.getMessage());
     }
   }
 
@@ -232,22 +228,22 @@ public class ChatsServiceImpl implements IChatsService {
   public Boolean addAsAdmin(UUID chatId, UUID userId, UUID adminUuid) {
     try {
       Chats chat = chatRepository.findById(chatId)
-          .orElseThrow(() -> new RuntimeException("Chat not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
 
       if (!chat.getIsGroupChat()) {
-        throw new RuntimeException("This is not a group chat");
+        throw new NotGroupChatException("This is not a group chat");
       }
       if (!chat.getGroupAdmins().stream().anyMatch(admin -> admin.getId().equals(adminUuid))) {
         return false; // Not an admin
       }
       User user = userRepository.findById(userId)
-          .orElseThrow(() -> new RuntimeException("User not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("User not found"));
       if (!chat.getUsers().contains(user)) {
-        throw new RuntimeException("User does not in the group chat");
+        throw new ResourceNotFoundException("User is not present in the group chat");
       }
 
       if (chat.getGroupAdmins().contains(user)) {
-        throw new RuntimeException("User is already an admin");
+        throw new GroupChatOperationException("User is already an admin");
       }
 
       chat.getGroupAdmins().add(user);
@@ -255,7 +251,7 @@ public class ChatsServiceImpl implements IChatsService {
       return true;
     } catch (Exception e) {
       e.printStackTrace();
-      throw new RuntimeException("Error adding as admin: " + e.getMessage());
+      throw new GroupChatOperationException("Error adding as admin: " + e.getMessage());
     }
   }
 
@@ -263,22 +259,22 @@ public class ChatsServiceImpl implements IChatsService {
   public Boolean removeAsAdmin(UUID chatId, UUID userId, UUID adminUuid) {
     try {
       Chats chat = chatRepository.findById(chatId)
-          .orElseThrow(() -> new RuntimeException("Chat not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
 
       if (!chat.getIsGroupChat()) {
-        throw new RuntimeException("This is not a group chat");
+        throw new NotGroupChatException("This is not a group chat");
       }
       if (!chat.getGroupAdmins().stream().anyMatch(admin -> admin.getId().equals(adminUuid))) {
         return false; // Not an admin
       }
       User user = userRepository.findById(userId)
-          .orElseThrow(() -> new RuntimeException("User not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("User not found"));
       if (!chat.getUsers().contains(user)) {
-        throw new RuntimeException("User does not in the group chat");
+        throw new ResourceNotFoundException("User is not present in the group chat");
       }
 
       if (!chat.getGroupAdmins().contains(user)) {
-        throw new RuntimeException("User is not an admin");
+        throw new GroupChatOperationException("User is not an admin");
       }
 
       chat.getGroupAdmins().removeIf(admin -> admin.getId().equals(userId));
@@ -286,7 +282,7 @@ public class ChatsServiceImpl implements IChatsService {
       return true;
     } catch (Exception e) {
       e.printStackTrace();
-      throw new RuntimeException("Error removing as admin: " + e.getMessage());
+      throw new GroupChatOperationException("Error removing as admin: " + e.getMessage());
     }
   }
 
@@ -294,15 +290,15 @@ public class ChatsServiceImpl implements IChatsService {
   public Boolean leaveGroupChat(UUID chatId, UUID userId) {
     try {
       Chats chat = chatRepository.findById(chatId)
-          .orElseThrow(() -> new RuntimeException("Chat not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
 
       if (!chat.getIsGroupChat()) {
-        throw new RuntimeException("This is not a group chat");
+        throw new NotGroupChatException("This is not a group chat");
       }
       User user = userRepository.findById(userId)
-          .orElseThrow(() -> new RuntimeException("User not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("User not found"));
       if (!chat.getUsers().contains(user)) {
-        throw new RuntimeException("User does not in the group chat");
+        throw new ResourceNotFoundException("User is not present in the group chat");
       }
 
       chat.getUsers().remove(user);
@@ -311,7 +307,7 @@ public class ChatsServiceImpl implements IChatsService {
       return true;
     } catch (Exception e) {
       e.printStackTrace();
-      throw new RuntimeException("Error leaving group chat: " + e.getMessage());
+      throw new GroupChatOperationException("Error leaving group chat: " + e.getMessage());
     }
   }
 
@@ -319,19 +315,19 @@ public class ChatsServiceImpl implements IChatsService {
   public Chats getGroupChatInfo(UUID chatId, UUID userId) {
     try {
       Chats chat = chatRepository.findById(chatId)
-          .orElseThrow(() -> new RuntimeException("Chat not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
 
       if (!chat.getIsGroupChat()) {
-        throw new RuntimeException("This is not a group chat");
+        throw new NotGroupChatException("This is not a group chat");
       }
       if (!chat.getUsers().stream().anyMatch(user -> user.getId().equals(userId))) {
-        throw new RuntimeException("User does not in the group chat");
+        throw new ResourceNotFoundException("User is not present in the group chat");
       }
 
       return chat;
     } catch (Exception e) {
       e.printStackTrace();
-      throw new RuntimeException("Error fetching group chat info: " + e.getMessage());
+      throw new GroupChatOperationException("Error fetching group chat info: " + e.getMessage());
     }
   }
 
@@ -339,17 +335,17 @@ public class ChatsServiceImpl implements IChatsService {
   public Boolean updateGroupChatDescription(UUID chatId, String description, UUID adminUuid) {
     try {
       Chats chat = chatRepository.findById(chatId)
-          .orElseThrow(() -> new RuntimeException("Chat not found"));
+          .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
 
       if (!chat.getIsGroupChat()) {
-        throw new RuntimeException("This is not a group chat");
+        throw new NotGroupChatException("This is not a group chat");
       }
       chat.setChatDescription(description);
       chatRepository.save(chat);
       return true;
     } catch (Exception e) {
       e.printStackTrace();
-      throw new RuntimeException("Error updating group chat description: " + e.getMessage());
+      throw new GroupChatOperationException("Error updating group chat description: " + e.getMessage());
     }
   }
 }

@@ -23,6 +23,11 @@ import com.sabarno.Chat_O_Mania.dto.UserDto;
 import com.sabarno.Chat_O_Mania.entity.Chats;
 import com.sabarno.Chat_O_Mania.entity.Message;
 import com.sabarno.Chat_O_Mania.entity.User;
+import com.sabarno.Chat_O_Mania.exception.GroupChatOperationException;
+import com.sabarno.Chat_O_Mania.exception.NotValidDataException;
+import com.sabarno.Chat_O_Mania.exception.ResourceNotFoundException;
+import com.sabarno.Chat_O_Mania.mapper.MessageMapper;
+import com.sabarno.Chat_O_Mania.mapper.UserMapper;
 import com.sabarno.Chat_O_Mania.repository.ChatRepository;
 import com.sabarno.Chat_O_Mania.repository.MessageRepository;
 import com.sabarno.Chat_O_Mania.repository.UserRepository;
@@ -51,23 +56,11 @@ public class MessageServiceImpl implements IMessageService {
     try {
       List<Message> messages = messageRepository.findByChatId(chatId);
 
-      List<MessageDto> messageList = messages.stream().map(message -> {
-        User sender = message.getSender();
-        Chats chat = message.getChat();
-
-        return new MessageDto(
-            message.getId(),
-            new UserDto(sender.getId(), sender.getUsername(), sender.getEmail(), sender.getMobileNumber(),
-                sender.getIsAdmin()),
-            message.getContent(),
-            chat.getChatName(),
-            chat.getId(),
-            message.getMediaUrl(),
-            message.getMediaType());
-      }).collect(Collectors.toList());
+      List<MessageDto> messageList = messages.stream().map(message -> MessageMapper.mapToMessageDto(message,
+          new MessageDto(), UserMapper.mapToUserDto(message.getSender(), new UserDto()))).collect(Collectors.toList());
       return messageList;
     } catch (Exception e) {
-      throw new RuntimeException("Error retrieving messages for chat: " + e);
+      throw new GroupChatOperationException("Error retrieving messages for chat: " + e);
     }
   }
 
@@ -76,14 +69,14 @@ public class MessageServiceImpl implements IMessageService {
     // 1. Validate
     if (request.getChatId() == null
         || (request.getContent() == null && (request.getFile() == null || request.getFile().isEmpty()))) {
-      throw new IllegalArgumentException("Message must have content or media");
+      throw new NotValidDataException("Message must have content or media");
     }
 
     User sender = userRepository.findById(senderId)
-        .orElseThrow(() -> new RuntimeException("Sender not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Sender not found"));
 
     Chats chat = chatRepository.findById(request.getChatId())
-        .orElseThrow(() -> new RuntimeException("Chat not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
 
     Message message = new Message();
     message.setSender(sender);
@@ -105,7 +98,7 @@ public class MessageServiceImpl implements IMessageService {
         message.setMediaType(request.getMediaType());
 
       } catch (IOException e) {
-        throw new RuntimeException("Media upload failed", e);
+        throw new GroupChatOperationException("Media upload failed" + e.getMessage());
       }
     }
 
@@ -113,21 +106,16 @@ public class MessageServiceImpl implements IMessageService {
     chat.getLatestMessages().add(message);
     chatRepository.save(chat);
 
-    return new MessageDto(
-        message.getId(),
-        new UserDto(sender.getId(), sender.getUsername(), sender.getEmail(), sender.getMobileNumber(),
-            sender.getIsAdmin()),
-        message.getContent(),
-        chat.getChatName(),
-        chat.getId(),
-        message.getMediaUrl(),
-        message.getMediaType());
+    message.setChat(chat);
+
+    return MessageMapper.mapToMessageDto(message, new MessageDto(),
+        UserMapper.mapToUserDto(sender, new UserDto()));
   }
 
   @Override
   public List<UUID> getRecipientsInChat(UUID chatId) {
     Chats chat = chatRepository.findById(chatId)
-        .orElseThrow(() -> new RuntimeException("Chat not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
 
     return chat.getUsers().stream()
         .map(User::getId)
@@ -137,7 +125,7 @@ public class MessageServiceImpl implements IMessageService {
   @Override
   public MessageDto editMessage(UUID senderId, EditMessageRequestDto request) {
     Message message = messageRepository.findById(request.getMessageId())
-        .orElseThrow(() -> new RuntimeException("Message not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
 
     boolean isSender = message.getSender().getId().equals(senderId);
     // Allow only sender to edit within 5 minutes
@@ -150,18 +138,10 @@ public class MessageServiceImpl implements IMessageService {
       message.setUpdatedAt(LocalDateTime.now());
       messageRepository.save(message);
       notifyClientsOfEdit(message);
-      return new MessageDto(
-          message.getId(),
-          new UserDto(message.getSender().getId(), message.getSender().getUsername(),
-              message.getSender().getEmail(), message.getSender().getMobileNumber(),
-              message.getSender().getIsAdmin()),
-          message.getContent(),
-          message.getChat().getChatName(),
-          message.getChat().getId(),
-          message.getMediaUrl(),
-          message.getMediaType());
+      return MessageMapper.mapToMessageDto(message, new MessageDto(),
+          UserMapper.mapToUserDto(message.getSender(), new UserDto()));
     }
-    throw new RuntimeException("You can only edit your own messages within 5 minutes of sending.");
+    throw new GroupChatOperationException("You can only edit your own messages within 5 minutes of sending.");
   }
 
   @Override
@@ -190,32 +170,21 @@ public class MessageServiceImpl implements IMessageService {
             "/queue/messages/delete",
             request.getMessageId());
       }
-
       return true;
     }
-
     return false;
   }
 
   private void notifyClientsOfEdit(Message message) {
-    
+
     List<UUID> recipients = getRecipientsInChat(message.getChat().getId());
 
     for (UUID recipientId : recipients) {
-        messagingTemplate.convertAndSendToUser(
-            recipientId.toString(),
-            "/queue/messages/edited",
-            new MessageDto(
-                message.getId(),
-                new UserDto(message.getSender().getId(), message.getSender().getUsername(),
-                    message.getSender().getEmail(), message.getSender().getMobileNumber(),
-                    message.getSender().getIsAdmin()),
-                message.getContent(),
-                message.getChat().getChatName(),
-                message.getChat().getId(),
-                message.getMediaUrl(),
-                message.getMediaType())
-        );
+      messagingTemplate.convertAndSendToUser(
+          recipientId.toString(),
+          "/queue/messages/edited",
+          MessageMapper.mapToMessageDto(message, new MessageDto(),
+              UserMapper.mapToUserDto(message.getSender(), new UserDto())));
     }
-}
+  }
 }
