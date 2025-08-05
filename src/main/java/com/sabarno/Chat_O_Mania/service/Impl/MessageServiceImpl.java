@@ -51,6 +51,12 @@ public class MessageServiceImpl implements IMessageService {
   @Autowired
   private SimpMessagingTemplate messagingTemplate;
 
+  /**
+   * Retrieves all messages for a given chat.
+   *
+   * @param chatId the ID of the chat for which to retrieve messages
+   * @return a list of MessageDto objects representing the messages in the chat
+   */
   @Override
   public List<MessageDto> getAllMessages(UUID chatId) {
     try {
@@ -64,6 +70,13 @@ public class MessageServiceImpl implements IMessageService {
     }
   }
 
+  /**
+   * Sends a message in a chat.
+   *
+   * @param senderId the ID of the user sending the message
+   * @param request  the request containing chat ID, content, and optional file
+   * @return the sent MessageDto object
+   */
   @Override
   public MessageDto sendMessage(UUID senderId, SendMessageRequestDto request) {
     // 1. Validate
@@ -112,6 +125,12 @@ public class MessageServiceImpl implements IMessageService {
         UserMapper.mapToUserDto(sender, new UserDto()));
   }
 
+  /**
+   * Retrieves the list of recipients in a chat.
+   *
+   * @param chatId the ID of the chat for which to retrieve recipients
+   * @return a list of UUIDs representing the IDs of users in the chat
+   */
   @Override
   public List<UUID> getRecipientsInChat(UUID chatId) {
     Chats chat = chatRepository.findById(chatId)
@@ -122,6 +141,13 @@ public class MessageServiceImpl implements IMessageService {
         .collect(Collectors.toList());
   }
 
+  /**
+   * Edits a message in a chat.
+   *
+   * @param senderId the ID of the user editing the message
+   * @param request  the request containing message ID and new content
+   * @return the edited MessageDto object
+   */
   @Override
   public MessageDto editMessage(UUID senderId, EditMessageRequestDto request) {
     Message message = messageRepository.findById(request.getMessageId())
@@ -144,6 +170,13 @@ public class MessageServiceImpl implements IMessageService {
     throw new GroupChatOperationException("You can only edit your own messages within 5 minutes of sending.");
   }
 
+  /**
+   * Deletes a message in a chat.
+   *
+   * @param senderId the ID of the user deleting the message
+   * @param request  the request containing message ID
+   * @return true if the message was deleted, false otherwise
+   */
   @Override
   public boolean deleteMessage(UUID senderId, DeleteMessageRequestDto request) {
     Optional<Message> optional = messageRepository.findById(request.getMessageId());
@@ -175,6 +208,11 @@ public class MessageServiceImpl implements IMessageService {
     return false;
   }
 
+  /**
+   * Notifies clients of an edited message.
+   *
+   * @param message the edited message to notify clients about
+   */
   private void notifyClientsOfEdit(Message message) {
 
     List<UUID> recipients = getRecipientsInChat(message.getChat().getId());

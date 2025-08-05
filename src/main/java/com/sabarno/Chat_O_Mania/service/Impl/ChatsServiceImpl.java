@@ -37,6 +37,12 @@ public class ChatsServiceImpl implements IChatsService {
   @Autowired
   UserRepository userRepository;
 
+  /**
+   * Fetches all chats for a given user, sorted by the latest message timestamp.
+   *
+   * @param userId the ID of the user whose chats are to be fetched
+   * @return a list of FetchChatDto containing chat details
+   */
   @Override
   public List<FetchChatDto> getChats(UUID userId) {
     Optional<Chats> chats = chatRepository.findByUsers_Id(userId);
@@ -75,6 +81,13 @@ public class ChatsServiceImpl implements IChatsService {
     return chatList;
   }
 
+  /**
+   * Accesses a one-to-one chat between the requesting user and the target user.
+   *
+   * @param requestingUserId the ID of the user requesting access
+   * @param targetUserId     the ID of the target user to access the chat with
+   * @return a ChatDto containing chat details
+   */
   @Override
   public ChatDto accessChat(UUID requestingUserId, AccessChatRequestDto targetUserId) {
     try {
@@ -109,6 +122,13 @@ public class ChatsServiceImpl implements IChatsService {
     }
   }
 
+  /**
+   * Creates a group chat with the specified users and admin.
+   *
+   * @param CreateGroupDto the DTO containing user IDs and chat details
+   * @param adminUuid      the ID of the admin user
+   * @return a ChatDto containing chat details
+   */
   @Override
   public Chats createGroupChat(CreateGroupDto dto, UUID adminUuid) {
     try {
@@ -144,6 +164,14 @@ public class ChatsServiceImpl implements IChatsService {
     }
   }
 
+  /**
+   * Renames a group chat.
+   *
+   * @param chatId    the ID of the chat to rename
+   * @param newName   the new name for the chat
+   * @param adminUuid the ID of the admin user performing the rename
+   * @return true if the rename was successful, false otherwise
+   */
   @Override
   public Boolean renameGroupChat(UUID chatId, String newName, UUID adminUuid) {
     if (newName == null || newName.isEmpty()) {
@@ -169,6 +197,14 @@ public class ChatsServiceImpl implements IChatsService {
     }
   }
 
+  /**
+   * Adds a user to a group chat.
+   *
+   * @param chatId    the ID of the chat to add the user to
+   * @param userId    the ID of the user to add
+   * @param adminUuid the ID of the admin user performing the operation
+   * @return true if the user was added successfully, false otherwise
+   */
   @Override
   public Boolean addToGroupChat(UUID chatId, UUID userId, UUID adminUuid) {
     try {
@@ -196,6 +232,14 @@ public class ChatsServiceImpl implements IChatsService {
     }
   }
 
+  /**
+   * Removes a user from a group chat.
+   *
+   * @param chatId    the ID of the chat to remove the user from
+   * @param userId    the ID of the user to remove
+   * @param adminUuid the ID of the admin user performing the operation
+   * @return true if the user was removed successfully, false otherwise
+   */
   @Override
   public Boolean removeFromGroupChat(UUID chatId, UUID userId, UUID adminUuid) {
     try {
@@ -224,6 +268,14 @@ public class ChatsServiceImpl implements IChatsService {
     }
   }
 
+  /**
+   * Adds a user as an admin in a group chat.
+   *
+   * @param chatId    the ID of the chat to add the user as admin
+   * @param userId    the ID of the user to add as admin
+   * @param adminUuid the ID of the admin user performing the operation
+   * @return true if the user was added as admin successfully, false otherwise
+   */
   @Override
   public Boolean addAsAdmin(UUID chatId, UUID userId, UUID adminUuid) {
     try {
@@ -255,6 +307,14 @@ public class ChatsServiceImpl implements IChatsService {
     }
   }
 
+  /**
+   * Removes a user as an admin in a group chat.
+   *
+   * @param chatId    the ID of the chat to remove the user as admin
+   * @param userId    the ID of the user to remove as admin
+   * @param adminUuid the ID of the admin user performing the operation
+   * @return true if the user was removed as admin successfully, false otherwise
+   */
   @Override
   public Boolean removeAsAdmin(UUID chatId, UUID userId, UUID adminUuid) {
     try {
@@ -286,6 +346,13 @@ public class ChatsServiceImpl implements IChatsService {
     }
   }
 
+  /**
+   * Leaves a group chat.
+   *
+   * @param chatId the ID of the chat to leave
+   * @param userId the ID of the user leaving the chat
+   * @return true if the user left the chat successfully, false otherwise
+   */
   @Override
   public Boolean leaveGroupChat(UUID chatId, UUID userId) {
     try {
@@ -311,6 +378,13 @@ public class ChatsServiceImpl implements IChatsService {
     }
   }
 
+  /**
+   * Gets information about a group chat.
+   *
+   * @param chatId the ID of the chat to get information about
+   * @param userId the ID of the user requesting the information
+   * @return a Chats object containing chat details
+   */
   @Override
   public Chats getGroupChatInfo(UUID chatId, UUID userId) {
     try {
@@ -331,6 +405,14 @@ public class ChatsServiceImpl implements IChatsService {
     }
   }
 
+  /**
+   * Updates the description of a group chat.
+   *
+   * @param chatId      the ID of the chat to update
+   * @param description the new description for the chat
+   * @param adminUuid   the ID of the admin user performing the update
+   * @return true if the update was successful, false otherwise
+   */
   @Override
   public Boolean updateGroupChatDescription(UUID chatId, String description, UUID adminUuid) {
     try {

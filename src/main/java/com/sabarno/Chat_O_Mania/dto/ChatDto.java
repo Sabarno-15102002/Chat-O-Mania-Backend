@@ -14,9 +14,30 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ChatDto {
 
+  /**
+   * Unique identifier for the chat.
+   */
   private UUID chatId;
+
+  /**
+   * Name of the chat.
+   */
   private String chatName;
+
+  /**
+   * Indicates whether the chat is a group chat.
+   */
   private Boolean isGroupChat;
+
+  /**
+   * List of users in the chat.
+   * This field is a many-to-many relationship with the User entity.
+   */
   private List<UserDto> users;
+
+  /**
+   * List of latest messages in the chat.
+   * This field is a one-to-many relationship with the Message entity.
+   */
   private List<Message> latestMessages;
 }

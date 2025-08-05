@@ -6,5 +6,8 @@ import lombok.Data;
 
 @Data
 public class DeleteMessageRequestDto {
+    /**
+     * The unique identifier of the message to be deleted.
+     */
   private UUID messageId;
 }

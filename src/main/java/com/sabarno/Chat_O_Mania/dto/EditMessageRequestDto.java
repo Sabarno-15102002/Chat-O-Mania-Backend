@@ -6,6 +6,13 @@ import lombok.Data;
 
 @Data
 public class EditMessageRequestDto {
+  /**
+   * The unique identifier of the message to be edited.
+   */
   private UUID messageId;
+
+  /**
+   * The new content of the message.
+   */
   private String newContent;
 }

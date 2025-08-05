@@ -25,26 +25,47 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Chats extends BaseEntity {
 
+  /**
+   * Unique identifier for the chat.
+   */
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  /**
+   * Name of the chat.
+   */
   @Column(name = "chat_name")
   private String chatName;
 
+  /**
+   * Indicates whether the chat is a group chat.
+   */
   @Column(name = "is_group_chat", nullable = false)
   private Boolean isGroupChat = false;
 
+  /**
+   * Indicates whether the chat is a secret chat.
+   */
   @ManyToMany
   @JoinTable(name = "chat_users", joinColumns = @JoinColumn(name = "chat_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
   private List<User> users = new ArrayList<>();
 
+  /**
+   * List of latest messages in the chat.
+   */
   @OneToMany(mappedBy = "chat")
   private List<Message> latestMessages;
 
+  /**
+   * List of group admins in the chat.
+   */
   @ManyToMany
   @JoinTable(name = "chat_group_admins", joinColumns = @JoinColumn(name = "chat_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
   private List<User> groupAdmins = new ArrayList<>();
 
+  /**
+   * Description of the chat.
+   */
   private String chatDescription;
 }

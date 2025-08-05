@@ -14,6 +14,12 @@ public class JwtService {
     private final Key key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
     private final long expiration = 86400000; // 1 day
 
+    /**
+     * Generates a JWT token for the given user ID.
+     *
+     * @param userId the ID of the user for whom the token is generated
+     * @return a JWT token as a String
+     */
     public String generateToken(String userId) {
         return Jwts.builder()
                 .setSubject(userId)
@@ -23,6 +29,12 @@ public class JwtService {
                 .compact();
     }
 
+    /**
+     * Extracts the user ID from the given JWT token.
+     *
+     * @param token the JWT token from which to extract the user ID
+     * @return the user ID as a String
+     */
     public String extractUserId(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(key)
@@ -32,6 +44,12 @@ public class JwtService {
                 .getSubject();
     }
 
+    /**
+     * Validates the given JWT token.
+     *
+     * @param token the JWT token to validate
+     * @return true if the token is valid, false otherwise
+     */
     public boolean validateToken(String token) {
         try {
             extractUserId(token);

@@ -22,6 +22,14 @@ public class FriendServiceImpl implements IFriendRequestService {
 
   @Autowired
   private UserRepository userRepository;
+
+    /**
+     * Sends a friend request from one user to another.
+     *
+     * @param senderId   the ID of the user sending the request
+     * @param receiverId the ID of the user receiving the request
+     * @return the created FriendRequest object
+     */
   @Override
     public FriendRequest sendFriendRequest(UUID senderId, UUID receiverId) {
         if (senderId.equals(receiverId)) {
@@ -48,6 +56,13 @@ public class FriendServiceImpl implements IFriendRequestService {
         return request;
     }
 
+    /**
+     * Accepts a friend request.
+     *
+     * @param requestId  the ID of the friend request to accept
+     * @param receiverId the ID of the user accepting the request
+     * @return true if the request was accepted successfully, false otherwise
+     */
     @Override
     public boolean acceptFriendRequest(UUID requestId, UUID receiverId) {
         FriendRequest request = friendRepo.findById(requestId)
@@ -68,6 +83,13 @@ public class FriendServiceImpl implements IFriendRequestService {
         return true;
     }
 
+    /**
+     * Rejects a friend request.
+     *
+     * @param requestId  the ID of the friend request to reject
+     * @param receiverId the ID of the user rejecting the request
+     * @return true if the request was rejected successfully, false otherwise
+     */
     @Override
     public boolean rejectFriendRequest(UUID requestId, UUID receiverId) {
         FriendRequest request = friendRepo.findById(requestId)
@@ -82,6 +104,11 @@ public class FriendServiceImpl implements IFriendRequestService {
         return true;
     }
 
+    /**
+     *  Retrieves all pending friend requests for a user.
+     * @param userId the ID of the user whose pending requests are to be retrieved
+     * @return a list of pending FriendRequest objects
+     */
     @Override
     public List<FriendRequest> getPendingRequests(UUID userId) {
         User user = userRepository.findById(userId)

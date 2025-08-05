@@ -40,11 +40,22 @@ public class UserServiceImpl implements IUserService {
 
   private BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder(12);
 
+  /**
+   * Retrieves all users in the system.
+   *
+   * @return a list of User objects representing all users
+   */
   @Override
   public List<User> getAllUsers() {
-    return null;
+    return null; //TODO: Implement this method to return all users
   }
 
+  /**
+   * Registers a new user in the system.
+   *
+   * @param request the registration request containing user details
+   * @return a UserDto object representing the registered user
+   */
   @Override
   public UserDto registerUser(RegisterRequestDto request) {
     if (userRepository.existsByEmail(request.getEmail())) {
@@ -62,6 +73,13 @@ public class UserServiceImpl implements IUserService {
     return UserMapper.mapToUserDto(savedUser, new UserDto());
   }
 
+  /**
+   * Logs in a user with the provided email and password.
+   *
+   * @param email    the email of the user
+   * @param password the password of the user
+   * @return a LoginResponseDto containing user details and JWT token
+   */
   @Override
   public LoginResponseDto loginUser(String email, String password) {
     User user = userRepository.findByEmail(email)
@@ -75,6 +93,13 @@ public class UserServiceImpl implements IUserService {
     return UserMapper.mapToLoginResponseDto(user, new LoginResponseDto(), token);
   }
 
+  /**
+   * Updates user details based on the provided UpdateUserDto.
+   *
+   * @param user   the UpdateUserDto containing updated user details
+   * @param userId the ID of the user to update
+   * @return a UserDto object representing the updated user
+   */
   @Override
   public UserDto updateUser(UpdateUserDto user, UUID userId) {
     User existingUser = userRepository.findById(userId)
@@ -94,6 +119,13 @@ public class UserServiceImpl implements IUserService {
     return UserMapper.mapToUserDto(updatedUser, new UserDto());
   }
 
+  /**
+   * Updates the password for a user.
+   *
+   * @param userId      the ID of the user whose password is to be updated
+   * @param requestDto  the request containing old and new passwords
+   * @return true if the password was updated successfully, false otherwise
+   */
   @Override
   public boolean updatePassword(UUID userId, UpdatePasswordRequestDto requestDto) {
     User user = userRepository.findById(userId)
@@ -109,6 +141,12 @@ public class UserServiceImpl implements IUserService {
     return true;
   }
 
+  /**
+   * Retrieves the last seen timestamp of a user.
+   *
+   * @param id the ID of the user
+   * @return the last seen timestamp as an Instant
+   */
   @Override
   public Instant getLastSeen(UUID id) {
     return userRepository.findById(id)
@@ -116,6 +154,12 @@ public class UserServiceImpl implements IUserService {
         .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
   }
 
+  /**
+   * Updates the profile picture of a user.
+   *
+   * @param userId the ID of the user whose profile picture is to be updated
+   * @param file   the MultipartFile containing the new profile picture
+   */
   @SuppressWarnings("unchecked")
   public void updateProfilePicture(UUID userId, MultipartFile file) {
     User user = userRepository.findById(userId)
@@ -149,6 +193,12 @@ public class UserServiceImpl implements IUserService {
     }
   }
 
+  /**
+   * Retrieves the user profile by user ID.
+   *
+   * @param userId the ID of the user whose profile is to be retrieved
+   * @return a ProfileDto object containing user profile details
+   */
   @Override
   public ProfileDto getUserProfile(UUID userId) {
     User user = userRepository.findById(userId)
@@ -157,6 +207,12 @@ public class UserServiceImpl implements IUserService {
     return UserMapper.mapToProfileDto(user, new ProfileDto());
   }
 
+  /**
+   * Adds a bio to the user's profile.
+   *
+   * @param userId the ID of the user
+   * @param bio    the bio to be added
+   */
   @Override
   public void addBio(UUID userId, String bio) {
     User user = userRepository.findById(userId)
@@ -170,6 +226,12 @@ public class UserServiceImpl implements IUserService {
     userRepository.save(user);
   }
 
+  /**
+   * Retrieves a list of friends for a user.
+   *
+   * @param userId the ID of the user whose friends are to be retrieved
+   * @return a list of UserDto objects representing the user's friends
+   */
   @Override
   public List<UserDto> getFriends(UUID userId) {
     User user = userRepository.findById(userId)
@@ -180,6 +242,13 @@ public class UserServiceImpl implements IUserService {
         .toList();
   }
 
+  /**
+   * Searches for users by username.
+   *
+   * @param query  the search query
+   * @param userId the ID of the user performing the search
+   * @return a list of UserDto objects matching the search query
+   */
   @Override
   public List<UserDto> searchUsers(String query, UUID userId) {
     if (query == null || query.isBlank()) {
@@ -194,6 +263,13 @@ public class UserServiceImpl implements IUserService {
         .toList();
   }
 
+  /**
+   * Removes a friend from the user's friend list.
+   *
+   * @param userId    the ID of the user removing the friend
+   * @param friendId  the ID of the friend to be removed
+   * @return true if the friend was removed successfully, false otherwise
+   */
   @Override
   public boolean removeFriend(UUID userId, UUID friendId) {
     User user = userRepository.findById(userId)

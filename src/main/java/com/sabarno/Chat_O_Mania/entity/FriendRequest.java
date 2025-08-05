@@ -20,16 +20,28 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FriendRequest extends BaseEntity {
+    /**
+     * Unique identifier for the friend request.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /**
+     * The user who sent the friend request.
+     */
     @ManyToOne
     private User sender;
 
+    /**
+     * The user who received the friend request.
+     */
     @ManyToOne
     private User receiver;
 
+    /**
+     * The status of the friend request.
+     */
     @Enumerated(EnumType.STRING)
     private RequestStatus status;
 

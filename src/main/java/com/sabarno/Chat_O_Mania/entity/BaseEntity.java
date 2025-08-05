@@ -22,18 +22,34 @@ import lombok.ToString;
 @EntityListeners(AuditingEntityListener.class)
 public class BaseEntity {
 
+  /**
+   * The timestamp when the entity was created.
+   * This field is automatically populated by the auditing system.
+   */
   @CreatedDate
   @Column(updatable = false)
   private LocalDateTime createdAt;
 
+  /**
+   * The user who created the entity.
+   * This field is automatically populated by the auditing system.
+   */
   @CreatedBy
   @Column(updatable = false)
   private String createdBy;
 
+  /**
+   * The timestamp when the entity was last updated.
+   * This field is automatically populated by the auditing system.
+   */
   @LastModifiedDate
   @Column(insertable = false)
   private LocalDateTime updatedAt;
 
+  /**
+   * The user who last updated the entity.
+   * This field is automatically populated by the auditing system.
+   */
   @LastModifiedBy
   @Column(insertable = false)
   private String updatedBy;
