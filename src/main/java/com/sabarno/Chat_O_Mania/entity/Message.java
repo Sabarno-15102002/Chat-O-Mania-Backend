@@ -1,5 +1,6 @@
 package com.sabarno.Chat_O_Mania.entity;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -73,4 +74,9 @@ public class Message extends BaseEntity {
    */
   @Column(name = "is_deleted")
   private boolean isDeleted = false;
+
+  /**
+   * The timestamp when the message was delivered.
+   */
+  private Instant deliveredAt;
 }
