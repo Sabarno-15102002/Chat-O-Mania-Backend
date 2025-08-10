@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +33,7 @@ import com.sabarno.Chat_O_Mania.repository.ChatRepository;
 import com.sabarno.Chat_O_Mania.repository.MessageRepository;
 import com.sabarno.Chat_O_Mania.repository.UserRepository;
 import com.sabarno.Chat_O_Mania.service.IMessageService;
+import com.sabarno.Chat_O_Mania.service.PresenceService;
 
 @Service
 public class MessageServiceImpl implements IMessageService {
@@ -50,6 +52,12 @@ public class MessageServiceImpl implements IMessageService {
 
   @Autowired
   private SimpMessagingTemplate messagingTemplate;
+
+  @Autowired
+  private PresenceService presenceService;
+
+  @Autowired
+  private RedisTemplate<String, Object> redisTemplate;
 
   /**
    * Retrieves all messages for a given chat.
@@ -121,8 +129,27 @@ public class MessageServiceImpl implements IMessageService {
 
     message.setChat(chat);
 
-    return MessageMapper.mapToMessageDto(message, new MessageDto(),
-        UserMapper.mapToUserDto(sender, new UserDto()));
+    MessageDto messageDto = MessageMapper.mapToMessageDto(message, new MessageDto(), UserMapper.mapToUserDto(sender, new UserDto()));
+
+    // Resolve recipients (works for group chats too)
+    List<UUID> recipients = getRecipientsInChat(chat.getId());
+    recipients.remove(senderId); // Remove sender from recipients
+
+    for (UUID recipient : recipients) {
+        boolean isOnline = presenceService.isUserOnline(recipient.toString());
+
+        if (isOnline) {
+            messagingTemplate.convertAndSend(
+                "/topic/chat/" + chat.getId() + "/messages", messageDto
+            );
+        } else {
+            // Queue in Redis for later delivery
+            String queueKey = "pending:" + recipient.toString();
+            redisTemplate.opsForList().rightPush(queueKey, messageDto);
+        }
+    }
+
+    return messageDto;
   }
 
   /**

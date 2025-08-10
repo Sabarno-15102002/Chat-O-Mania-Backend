@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -11,6 +12,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import com.sabarno.Chat_O_Mania.repository.UserRepository;
 import com.sabarno.Chat_O_Mania.service.UserPresenceService;
 
+@Component
 public class PresenceWebSocketHandler extends TextWebSocketHandler {
     @Autowired 
     private UserPresenceService presenceService;

@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.info.Info;
 						title = "Chat-O-Mania API",
 						version = "1.0",
 						description = "API for Chat-O-Mania, a chat application built with Spring Boot"
+						// http://localhost:8080/swagger-ui/index.html
 				)
 )
 public class ChatOManiaApplication {
