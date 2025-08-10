@@ -13,6 +13,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
+import com.sabarno.Chat_O_Mania.dto.TypingStatusDto;
 import com.sabarno.Chat_O_Mania.service.IUserService;
 import com.sabarno.Chat_O_Mania.service.UserPresenceService;
 
@@ -33,15 +34,15 @@ public class WebSocketController {
    * Payload shape (client): { "chatId": "uuid", "senderId": "uuid", "typing": true }
    */
   @MessageMapping("/typing")
-  public void handleTyping(Map<String, Object> payload) {
-    Object chatId = payload.get("chatId");
-    if (chatId == null)
-      return;
-    String destination = "/topic/typing." + chatId.toString();
+  public void handleTyping(TypingStatusDto typingStatus) {
+    if (typingStatus.getChatId() == null || typingStatus.getFrom() == null) {
+        return; // invalid payload
+    }
 
-    messagingTemplate.convertAndSend(destination, Map.of(
-        "senderId", payload.get("senderId"),
-        "typing", payload.get("typing")));
+    String destination = "/topic/typing." + typingStatus.getChatId();
+
+    // Broadcast the full typing info to everyone in the chat
+    messagingTemplate.convertAndSend(destination, typingStatus);
   }
 
   @GetMapping("/api/presence/online")

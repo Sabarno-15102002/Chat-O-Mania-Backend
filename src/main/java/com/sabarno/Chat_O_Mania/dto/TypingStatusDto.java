@@ -7,19 +7,23 @@ import lombok.Data;
 @Data
 public class TypingStatusDto {
 
+/**
+   * Chat (group or direct) where typing is happening.
+   */
+  private UUID chatId;
+
   /**
    * Unique identifier for the user who is typing.
    */
   private UUID from;
 
   /**
-   * Unique identifier for the user who is receiving the typing status.
+   * Display name of the typing user.
    */
-  private UUID to;
+  private String username;
 
   /**
    * Indicates whether the user is currently typing.
-   * This field is used to notify the recipient that the sender is typing a message.
    */
   private boolean typing;
 }
