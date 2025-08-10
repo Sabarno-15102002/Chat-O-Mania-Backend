@@ -35,6 +35,8 @@ import com.sabarno.Chat_O_Mania.repository.UserRepository;
 import com.sabarno.Chat_O_Mania.service.IMessageService;
 import com.sabarno.Chat_O_Mania.service.PresenceService;
 
+import jakarta.transaction.Transactional;
+
 @Service
 public class MessageServiceImpl implements IMessageService {
 
@@ -129,24 +131,24 @@ public class MessageServiceImpl implements IMessageService {
 
     message.setChat(chat);
 
-    MessageDto messageDto = MessageMapper.mapToMessageDto(message, new MessageDto(), UserMapper.mapToUserDto(sender, new UserDto()));
+    MessageDto messageDto = MessageMapper.mapToMessageDto(message, new MessageDto(),
+        UserMapper.mapToUserDto(sender, new UserDto()));
 
     // Resolve recipients (works for group chats too)
     List<UUID> recipients = getRecipientsInChat(chat.getId());
     recipients.remove(senderId); // Remove sender from recipients
 
     for (UUID recipient : recipients) {
-        boolean isOnline = presenceService.isUserOnline(recipient.toString());
+      boolean isOnline = presenceService.isUserOnline(recipient.toString());
 
-        if (isOnline) {
-            messagingTemplate.convertAndSend(
-                "/topic/chat/" + chat.getId() + "/messages", messageDto
-            );
-        } else {
-            // Queue in Redis for later delivery
-            String queueKey = "pending:" + recipient.toString();
-            redisTemplate.opsForList().rightPush(queueKey, messageDto);
-        }
+      if (isOnline) {
+        messagingTemplate.convertAndSend(
+            "/topic/chat/" + chat.getId() + "/messages", messageDto);
+      } else {
+        // Queue in Redis for later delivery
+        String queueKey = "pending:" + recipient.toString();
+        redisTemplate.opsForList().rightPush(queueKey, messageDto);
+      }
     }
 
     return messageDto;
@@ -251,5 +253,11 @@ public class MessageServiceImpl implements IMessageService {
           MessageMapper.mapToMessageDto(message, new MessageDto(),
               UserMapper.mapToUserDto(message.getSender(), new UserDto())));
     }
+  }
+
+  @Override
+  @Transactional
+  public void markAsDelivered(String receiverId, String messageId) {
+    messageRepository.markDelivered(receiverId, messageId, Instant.now());
   }
 }

@@ -15,4 +15,5 @@ public interface IMessageService {
   List<UUID> getRecipientsInChat(UUID chatId);
   MessageDto editMessage(UUID senderId, EditMessageRequestDto request);
   boolean deleteMessage(UUID senderId, DeleteMessageRequestDto request);
+  void markAsDelivered(String string, String messageId);
 }
