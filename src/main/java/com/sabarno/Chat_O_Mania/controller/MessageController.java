@@ -1,6 +1,8 @@
 package com.sabarno.Chat_O_Mania.controller;
 
 import java.security.Principal;
+import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -128,4 +130,26 @@ public class MessageController {
     }
     return ResponseEntity.ok(success);
   }
+
+  @GetMapping("/search")
+    public ResponseEntity<List<MessageDto>> searchMessages(
+            @RequestParam UUID chatId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Instant startDate,
+            @RequestParam(required = false) Instant endDate) {
+
+        List<MessageDto> results;
+
+        if (keyword != null && startDate != null && endDate != null) {
+            results = messageService.searchMessagesByKeywordAndDate(chatId, keyword, startDate, endDate);
+        } else if (keyword != null) {
+            results = messageService.searchMessagesByKeyword(chatId, keyword);
+        } else if (startDate != null && endDate != null) {
+            results = messageService.searchMessagesByDate(chatId, startDate, endDate);
+        } else {
+            results = Collections.emptyList();
+        }
+
+        return ResponseEntity.ok(results);
+    }
 }

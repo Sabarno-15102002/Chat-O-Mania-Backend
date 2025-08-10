@@ -255,9 +255,69 @@ public class MessageServiceImpl implements IMessageService {
     }
   }
 
+  /**
+   * Marks a message as delivered.
+   *
+   * @param receiverId the ID of the user receiving the message
+   * @param messageId  the ID of the message to mark as delivered
+   */
   @Override
   @Transactional
   public void markAsDelivered(String receiverId, String messageId) {
     messageRepository.markDelivered(receiverId, messageId, Instant.now());
   }
+
+  /**
+   * Searches messages by keyword and date range.
+   *
+   * @param chatId    the ID of the chat to search in
+   * @param keyword   the keyword to search for
+   * @param startDate the start date of the range
+   * @param endDate   the end date of the range
+   * @return a list of MessageDto objects matching the search criteria
+   */
+  @Override
+  public List<MessageDto> searchMessagesByKeywordAndDate(UUID chatId, String keyword, Instant startDate,
+      Instant endDate) {
+    List<Message> messages = messageRepository.searchMessagesByKeywordAndDate(chatId, keyword, startDate, endDate);
+    return messages.stream()
+        .map(message -> MessageMapper.mapToMessageDto(message, new MessageDto(),
+            UserMapper.mapToUserDto(message.getSender(), new UserDto())))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Searches messages by keyword.
+   *
+   * @param chatId  the ID of the chat to search in
+   * @param keyword the keyword to search for
+   * @return a list of MessageDto objects matching the keyword
+   */
+  @Override
+  public List<MessageDto> searchMessagesByKeyword(UUID chatId, String keyword) {
+    List<Message> messages = messageRepository.searchMessagesByKeyword (chatId, keyword);
+    return messages.stream()
+        .map(message -> MessageMapper.mapToMessageDto(message, new MessageDto(),
+            UserMapper.mapToUserDto(message.getSender(), new UserDto())))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Searches messages by date range.
+   *
+   * @param chatId     the ID of the chat to search in
+   * @param startDate  the start date of the range
+   * @param endDate    the end date of the range
+   * @return a list of MessageDto objects matching the date range
+   */
+  @Override
+  public List<MessageDto> searchMessagesByDate(UUID chatId, Instant startDate, Instant endDate) {
+    List<Message> messages = messageRepository.searchMessagesByDateRange(chatId, startDate, endDate);
+    return messages.stream()
+        .map(message -> MessageMapper.mapToMessageDto(message, new MessageDto(),
+            UserMapper.mapToUserDto(message.getSender(), new UserDto())))
+        .collect(Collectors.toList());
+  }
+
+  
 }
