@@ -7,6 +7,9 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,6 +40,9 @@ public class UserServiceImpl implements IUserService {
 
   @Autowired
   private Cloudinary cloudinary;
+
+  @Autowired
+  private RedisCacheManager cacheManager;
 
   private BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder(12);
 
@@ -90,6 +96,7 @@ public class UserServiceImpl implements IUserService {
     }
 
     String token = jwtService.generateToken(user.getId().toString());
+    cacheManager.getCache("loginSessions").put(user.getId().toString(), token);
     return UserMapper.mapToLoginResponseDto(user, new LoginResponseDto(), token);
   }
 
@@ -116,6 +123,8 @@ public class UserServiceImpl implements IUserService {
     }
 
     User updatedUser = userRepository.save(existingUser);
+    cacheManager.getCache("userProfile").evict(userId);
+    cacheManager.getCache("userProfile").put(userId, UserMapper.mapToProfileDto(updatedUser, new ProfileDto()));
     return UserMapper.mapToUserDto(updatedUser, new UserDto());
   }
 
@@ -138,6 +147,9 @@ public class UserServiceImpl implements IUserService {
     user.setPassword(passwordEncoder.encode(requestDto.getNewPassword()));
     userRepository.save(user);
 
+    // Evict the user profile cache to ensure the updated password is reflected
+    cacheManager.getCache("userProfile").evict(userId);
+    cacheManager.getCache("userProfile").put(userId, UserMapper.mapToProfileDto(user, new ProfileDto()));
     return true;
   }
 
@@ -149,9 +161,18 @@ public class UserServiceImpl implements IUserService {
    */
   @Override
   public Instant getLastSeen(UUID id) {
-    return userRepository.findById(id)
+
+    Cache cache = cacheManager.getCache("userProfile");
+    if (cache != null && cache.get(id) != null) {
+      ProfileDto profileDto = (ProfileDto) cache.get(id).get();
+      if (profileDto != null && profileDto.getLastSeen() != null) {
+        return profileDto.getLastSeen();
+      }
+    }
+    Instant lastseen = userRepository.findById(id)
         .map(User::getLastSeen)
         .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
+    return lastseen != null ? lastseen : Instant.now();
   }
 
   /**
@@ -188,6 +209,8 @@ public class UserServiceImpl implements IUserService {
       user.setProfilePicPublicId(publicId);
 
       userRepository.save(user);
+      cacheManager.getCache("userProfile").evict(userId);
+      cacheManager.getCache("userProfile").put(userId, UserMapper.mapToProfileDto(user, new ProfileDto()));
     } catch (IOException e) {
       throw new RuntimeException("Failed to upload image", e);
     }
@@ -200,6 +223,7 @@ public class UserServiceImpl implements IUserService {
    * @return a ProfileDto object containing user profile details
    */
   @Override
+  @Cacheable(value = "userProfile", key = "#userId")
   public ProfileDto getUserProfile(UUID userId) {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
@@ -224,6 +248,8 @@ public class UserServiceImpl implements IUserService {
 
     user.setBio(bio);
     userRepository.save(user);
+    cacheManager.getCache("userProfile").evict(userId);
+    cacheManager.getCache("userProfile").put(userId, UserMapper.mapToProfileDto(user, new ProfileDto()));
   }
 
   /**
@@ -233,6 +259,7 @@ public class UserServiceImpl implements IUserService {
    * @return a list of UserDto objects representing the user's friends
    */
   @Override
+  @Cacheable(value = "userFriends", key = "#userId")
   public List<UserDto> getFriends(UUID userId) {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
@@ -286,7 +313,8 @@ public class UserServiceImpl implements IUserService {
 
     userRepository.save(user);
     userRepository.save(friend);
-
+    cacheManager.getCache("userFriends").evict(userId);
+    cacheManager.getCache("userFriends").put(userId, friend);
     return true;
   }
 }

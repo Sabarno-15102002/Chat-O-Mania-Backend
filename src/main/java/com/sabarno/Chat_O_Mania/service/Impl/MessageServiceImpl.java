@@ -11,6 +11,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -60,6 +62,9 @@ public class MessageServiceImpl implements IMessageService {
 
   @Autowired
   private RedisTemplate<String, Object> redisTemplate;
+
+  @Autowired
+  private RedisCacheManager cacheManager;
 
   /**
    * Retrieves all messages for a given chat.
@@ -131,6 +136,26 @@ public class MessageServiceImpl implements IMessageService {
 
     message.setChat(chat);
 
+    if(chat.getIsGroupChat()) {
+      // For group chats, update the latest messages in the cache
+      Cache cache = cacheManager.getCache("groupChatInfo");
+      if( cache != null) {
+        cache.evict(chat.getId().toString() + "-" + senderId.toString());
+        cache.put(chat.getId().toString() + "-" + senderId.toString(), chat.getLatestMessages());
+      }
+      
+    } else {
+      // For one-to-one chats, update the cache with the latest message
+      Cache cache = cacheManager.getCache("oneToOneChat");
+      if (cache != null){
+        cache.put(senderId.toString() + "-" + chat.getUsers().stream()
+              .filter(user -> !user.getId().equals(senderId))
+              .findFirst()
+              .orElseThrow(() -> new ResourceNotFoundException("No other user in chat"))
+              .getId(), chat.getLatestMessages());
+      }
+    }
+
     MessageDto messageDto = MessageMapper.mapToMessageDto(message, new MessageDto(),
         UserMapper.mapToUserDto(sender, new UserDto()));
 
@@ -193,6 +218,24 @@ public class MessageServiceImpl implements IMessageService {
       message.setUpdatedAt(LocalDateTime.now());
       messageRepository.save(message);
       notifyClientsOfEdit(message);
+      // Update the cache
+      if( message.getChat().getIsGroupChat()) {
+        Cache cache = cacheManager.getCache("groupChatInfo");
+        if (cache != null) {
+          cache.evict(message.getChat().getId().toString() + "-" + senderId.toString());
+          cache.put(message.getChat().getId().toString() + "-" + senderId.toString(), message);
+        }
+      }
+      else {
+        Cache cache = cacheManager.getCache("oneToOneChat");
+        if (cache != null) {
+          cache.put(senderId.toString() + "-" + message.getChat().getUsers().stream()
+              .filter(user -> !user.getId().equals(senderId))
+              .findFirst()
+              .orElseThrow(() -> new ResourceNotFoundException("No other user in chat"))
+              .getId(), message);
+        }
+      }
       return MessageMapper.mapToMessageDto(message, new MessageDto(),
           UserMapper.mapToUserDto(message.getSender(), new UserDto()));
     }
@@ -231,6 +274,23 @@ public class MessageServiceImpl implements IMessageService {
             userId.toString(),
             "/queue/messages/delete",
             request.getMessageId());
+      }
+      // Update the cache
+      if( isGroup) {
+        Cache cache = cacheManager.getCache("groupChatInfo");
+        if (cache != null) {
+          cache.evict(chat.getId().toString() + "-" + senderId.toString());
+          cache.put(chat.getId().toString() + "-" + senderId.toString(), chat.getLatestMessages());
+        }
+      } else {
+        Cache cache = cacheManager.getCache("oneToOneChat");
+        if (cache != null) {
+          cache.evict(senderId.toString() + "-" + chat.getUsers().stream()
+              .filter(user -> !user.getId().equals(senderId))
+              .findFirst()
+              .orElseThrow(() -> new ResourceNotFoundException("No other user in chat"))
+              .getId());
+        }
       }
       return true;
     }

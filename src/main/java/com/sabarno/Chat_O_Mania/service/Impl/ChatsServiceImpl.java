@@ -8,6 +8,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.stereotype.Service;
 
 import com.sabarno.Chat_O_Mania.dto.AccessChatRequestDto;
@@ -37,6 +39,9 @@ public class ChatsServiceImpl implements IChatsService {
   @Autowired
   UserRepository userRepository;
 
+  @Autowired
+  private RedisCacheManager cacheManager;
+
   /**
    * Fetches all chats for a given user, sorted by the latest message timestamp.
    *
@@ -44,6 +49,7 @@ public class ChatsServiceImpl implements IChatsService {
    * @return a list of FetchChatDto containing chat details
    */
   @Override
+  @Cacheable(value = "allchats", key = "#userId")
   public List<FetchChatDto> getChats(UUID userId) {
     Optional<Chats> chats = chatRepository.findByUsers_Id(userId);
 
@@ -89,6 +95,7 @@ public class ChatsServiceImpl implements IChatsService {
    * @return a ChatDto containing chat details
    */
   @Override
+  @Cacheable(value = "oneToOneChat", key = "#requestingUserId + '-' + #targetUserId.targetUserId")
   public ChatDto accessChat(UUID requestingUserId, AccessChatRequestDto targetUserId) {
     try {
       List<Chats> chats = chatRepository.findOneToOneChat(requestingUserId, targetUserId.getTargetUserId());
@@ -99,23 +106,31 @@ public class ChatsServiceImpl implements IChatsService {
         userDtos = users.stream()
             .map(user -> UserMapper.mapToUserDto(user, new UserDto()))
             .toList();
+        return ChatMapper.mapToChatDto(chat, new ChatDto(), userDtos);
+      } else {
+
+        User user1 = userRepository.findById(requestingUserId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + requestingUserId));
+        User user2 = userRepository.findById(targetUserId.getTargetUserId()).orElseThrow(
+            () -> new ResourceNotFoundException("Target user not found with ID: " + targetUserId.getTargetUserId()));
+
+        if (user1.getFriends().stream().noneMatch(friend -> friend.getId().equals(user2.getId()))) {
+          throw new ResourceNotFoundException("You are not friends with this user");
+        }
+        Chats newChat = new Chats();
+        newChat.setChatName("sender");
+        newChat.setIsGroupChat(false);
+        newChat.setUsers(List.of(user1, user2));
+
+        chatRepository.save(newChat);
+
+        List<User> users = newChat.getUsers();
+        userDtos = users.stream()
+            .map(user -> UserMapper.mapToUserDto(user, new UserDto()))
+            .toList();
+        cacheManager.getCache("oneToOneChat").put(requestingUserId, requestingUserId.toString() + "-" + targetUserId.getTargetUserId());
+        return ChatMapper.mapToChatDto(newChat, new ChatDto(), userDtos);
       }
-
-      User user1 = userRepository.findById(requestingUserId).orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + requestingUserId));
-      User user2 = userRepository.findById(targetUserId.getTargetUserId()).orElseThrow(() -> new ResourceNotFoundException("Target user not found with ID: " + targetUserId.getTargetUserId()));
-
-      Chats newChat = new Chats();
-      newChat.setChatName("sender");
-      newChat.setIsGroupChat(false);
-      newChat.setUsers(List.of(user1, user2));
-
-      chatRepository.save(newChat);
-
-      List<User> users = newChat.getUsers();
-      userDtos = users.stream()
-          .map(user -> UserMapper.mapToUserDto(user, new UserDto()))
-          .toList();
-      return ChatMapper.mapToChatDto(newChat, new ChatDto(), userDtos);
     } catch (Exception e) {
       e.printStackTrace();
       throw new RuntimeException("Error accessing chat: " + e.getMessage());
@@ -157,6 +172,11 @@ public class ChatsServiceImpl implements IChatsService {
 
       Chats savedChat = chatRepository.save(chat);
 
+      cacheManager.getCache("allchats").evict(adminUuid.toString());
+      cacheManager.getCache("allchats").put(adminUuid, getChats(adminUuid));
+
+      cacheManager.getCache("groupChatInfo").evict(chat.getId().toString() + "-" + adminUuid.toString());
+      cacheManager.getCache("groupChatInfo").put(chat.getId().toString() + "-" + adminUuid.toString(), chat);
       return savedChat;
     } catch (Exception e) {
       e.printStackTrace();
@@ -190,6 +210,11 @@ public class ChatsServiceImpl implements IChatsService {
 
       chat.setChatName(newName);
       chatRepository.save(chat);
+      cacheManager.getCache("allchats").evict(adminUuid.toString());
+      cacheManager.getCache("allchats").put(adminUuid, getChats(adminUuid));
+
+      cacheManager.getCache("groupChatInfo").evict(chatId.toString() + "-" + adminUuid.toString());
+      cacheManager.getCache("groupChatInfo").put(chatId.toString() + "-" + adminUuid.toString(), chat);
       return true;
     } catch (Exception e) {
       e.printStackTrace();
@@ -225,6 +250,11 @@ public class ChatsServiceImpl implements IChatsService {
 
       chat.getUsers().add(user);
       chatRepository.save(chat);
+      cacheManager.getCache("allchats").evict(adminUuid.toString());
+      cacheManager.getCache("allchats").put(adminUuid, getChats(adminUuid));
+
+      cacheManager.getCache("groupChatInfo").evict(chatId.toString() + "-" + adminUuid.toString());
+      cacheManager.getCache("groupChatInfo").put(chatId.toString() + "-" + adminUuid.toString(), chat);
       return true;
     } catch (Exception e) {
       e.printStackTrace();
@@ -261,6 +291,11 @@ public class ChatsServiceImpl implements IChatsService {
       chat.getUsers().remove(user);
       chat.getGroupAdmins().removeIf(admin -> admin.getId().equals(userId));
       chatRepository.save(chat);
+      cacheManager.getCache("allchats").evict(adminUuid.toString());
+      cacheManager.getCache("allchats").put(adminUuid, getChats(adminUuid));
+
+      cacheManager.getCache("groupChatInfo").evict(chatId.toString() + "-" + adminUuid.toString());
+      cacheManager.getCache("groupChatInfo").put(chatId.toString() + "-" + adminUuid.toString(), chat);
       return true;
     } catch (Exception e) {
       e.printStackTrace();
@@ -300,6 +335,11 @@ public class ChatsServiceImpl implements IChatsService {
 
       chat.getGroupAdmins().add(user);
       chatRepository.save(chat);
+      cacheManager.getCache("allchats").evict(adminUuid.toString());
+      cacheManager.getCache("allchats").put(adminUuid, getChats(adminUuid));
+
+      cacheManager.getCache("groupChatInfo").evict(chatId.toString() + "-" + adminUuid.toString());
+      cacheManager.getCache("groupChatInfo").put(chatId.toString() + "-" + adminUuid.toString(), chat);
       return true;
     } catch (Exception e) {
       e.printStackTrace();
@@ -339,6 +379,11 @@ public class ChatsServiceImpl implements IChatsService {
 
       chat.getGroupAdmins().removeIf(admin -> admin.getId().equals(userId));
       chatRepository.save(chat);
+      cacheManager.getCache("allchats").evict(adminUuid.toString());
+      cacheManager.getCache("allchats").put(adminUuid, getChats(adminUuid));
+
+      cacheManager.getCache("groupChatInfo").evict(chatId.toString() + "-" + adminUuid.toString());
+      cacheManager.getCache("groupChatInfo").put(chatId.toString() + "-" + adminUuid.toString(), chat);
       return true;
     } catch (Exception e) {
       e.printStackTrace();
@@ -371,6 +416,12 @@ public class ChatsServiceImpl implements IChatsService {
       chat.getUsers().remove(user);
       chat.getGroupAdmins().removeIf(admin -> admin.getId().equals(userId));
       chatRepository.save(chat);
+      cacheManager.getCache("allchats").evict(userId.toString());
+      cacheManager.getCache("allchats").put(userId, getChats(userId));
+
+      cacheManager.getCache("groupChatInfo").evict(chatId.toString() + "-" + userId.toString());
+      cacheManager.getCache("groupChatInfo").put(chatId.toString() + "-" + userId.toString(), chat);
+
       return true;
     } catch (Exception e) {
       e.printStackTrace();
@@ -386,6 +437,7 @@ public class ChatsServiceImpl implements IChatsService {
    * @return a Chats object containing chat details
    */
   @Override
+  @Cacheable(value = "groupChatInfo", key = "#chatId + '-' + #userId")
   public Chats getGroupChatInfo(UUID chatId, UUID userId) {
     try {
       Chats chat = chatRepository.findById(chatId)
@@ -424,6 +476,11 @@ public class ChatsServiceImpl implements IChatsService {
       }
       chat.setChatDescription(description);
       chatRepository.save(chat);
+      cacheManager.getCache("allchats").evict(adminUuid.toString());
+      cacheManager.getCache("allchats").put(adminUuid, getChats(adminUuid));
+
+      cacheManager.getCache("groupChatInfo").evict(chatId.toString() + "-" + adminUuid.toString());
+      cacheManager.getCache("groupChatInfo").put(chatId.toString() + "-" + adminUuid.toString(), chat);
       return true;
     } catch (Exception e) {
       e.printStackTrace();

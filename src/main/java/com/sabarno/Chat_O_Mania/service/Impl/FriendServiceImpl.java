@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.stereotype.Service;
 
 import com.sabarno.Chat_O_Mania.entity.FriendRequest;
@@ -22,6 +23,9 @@ public class FriendServiceImpl implements IFriendRequestService {
 
   @Autowired
   private UserRepository userRepository;
+
+  @Autowired
+  private RedisCacheManager cacheManager;
 
     /**
      * Sends a friend request from one user to another.
@@ -80,6 +84,8 @@ public class FriendServiceImpl implements IFriendRequestService {
 
         request.setStatus(RequestStatus.ACCEPTED);
         friendRepo.save(request);
+        cacheManager.getCache("userFriends").evict(receiverId);
+        cacheManager.getCache("userFriends").put(receiverId, receiver);
         return true;
     }
 
