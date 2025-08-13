@@ -1,6 +1,7 @@
 package com.sabarno.Chat_O_Mania.service.Impl;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import com.sabarno.Chat_O_Mania.config.RateLimiter;
 import com.sabarno.Chat_O_Mania.dto.LoginResponseDto;
 import com.sabarno.Chat_O_Mania.dto.ProfileDto;
 import com.sabarno.Chat_O_Mania.dto.RegisterRequestDto;
@@ -25,6 +27,7 @@ import com.sabarno.Chat_O_Mania.dto.UserDto;
 import com.sabarno.Chat_O_Mania.entity.User;
 import com.sabarno.Chat_O_Mania.exception.NotValidDataException;
 import com.sabarno.Chat_O_Mania.exception.ResourceNotFoundException;
+import com.sabarno.Chat_O_Mania.exception.TooManyRequestsException;
 import com.sabarno.Chat_O_Mania.mapper.UserMapper;
 import com.sabarno.Chat_O_Mania.repository.UserRepository;
 import com.sabarno.Chat_O_Mania.service.IUserService;
@@ -43,6 +46,9 @@ public class UserServiceImpl implements IUserService {
 
   @Autowired
   private RedisCacheManager cacheManager;
+
+  @Autowired
+  private RateLimiter rateLimiter;
 
   private BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder(12);
 
@@ -88,6 +94,9 @@ public class UserServiceImpl implements IUserService {
    */
   @Override
   public LoginResponseDto loginUser(String email, String password) {
+    if (!rateLimiter.isAllowed("login:" + email, 5, Duration.ofMinutes(5))) {
+        throw new TooManyRequestsException("Too many login attempts. Please wait and try again.");
+    }
     User user = userRepository.findByEmail(email)
         .orElseThrow(() -> new NotValidDataException("Invalid email or password"));
 

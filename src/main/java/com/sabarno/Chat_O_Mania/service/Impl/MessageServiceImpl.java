@@ -18,6 +18,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.cloudinary.Cloudinary;
+import com.sabarno.Chat_O_Mania.config.RateLimiter;
 import com.sabarno.Chat_O_Mania.dto.DeleteMessageRequestDto;
 import com.sabarno.Chat_O_Mania.dto.EditMessageRequestDto;
 import com.sabarno.Chat_O_Mania.dto.MessageDto;
@@ -66,6 +67,9 @@ public class MessageServiceImpl implements IMessageService {
   @Autowired
   private RedisCacheManager cacheManager;
 
+  @Autowired
+  private RateLimiter rateLimiter;
+
   /**
    * Retrieves all messages for a given chat.
    *
@@ -94,6 +98,10 @@ public class MessageServiceImpl implements IMessageService {
    */
   @Override
   public MessageDto sendMessage(UUID senderId, SendMessageRequestDto request) {
+
+    if(!rateLimiter.isAllowed("sendMessage:" + senderId, 10, Duration.ofSeconds(30))) {
+      throw new RuntimeException("Too many messages sent. Please wait before trying again.");
+    }
     // 1. Validate
     if (request.getChatId() == null
         || (request.getContent() == null && (request.getFile() == null || request.getFile().isEmpty()))) {
