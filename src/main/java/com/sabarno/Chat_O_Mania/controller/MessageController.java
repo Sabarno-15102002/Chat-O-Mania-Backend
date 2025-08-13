@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -47,7 +48,7 @@ public class MessageController {
   @Autowired
   private ChatRepository chatRepository;
 
-  @Operation(summary = "Get all messages in a chat", description = "Fetches all messages for a given chat ID.")
+  @Operation(summary = "Get paginated messages in a chat", description = "Fetches messages for a given chat ID with pagination.")
   @ApiResponses(value = {
       @ApiResponse(responseCode = "200", description = "Successfully retrieved messages"),
       @ApiResponse(responseCode = "400", description = "Bad request - Invalid chat ID"),
@@ -55,8 +56,12 @@ public class MessageController {
       @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
   })
   @GetMapping("/")
-  public ResponseEntity<List<MessageDto>> getAllMessages(@RequestParam UUID chatId) {
-    List<MessageDto> messages = messageService.getAllMessages(chatId);
+  public ResponseEntity<Page<MessageDto>> getMessages(
+      @RequestParam UUID chatId,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size) {
+
+    Page<MessageDto> messages = messageService.getMessages(chatId, page, size);
     return ResponseEntity.ok(messages);
   }
 
@@ -108,9 +113,10 @@ public class MessageController {
     UUID senderId = UUID.fromString(principal.getName());
     MessageDto updated = messageService.editMessage(senderId, request);
     if (updated != null) {
-        return ResponseEntity.ok(updated);
+      return ResponseEntity.ok(updated);
     } else {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Edit not allowed. Only sender can edit within 5 minutes.");
+      return ResponseEntity.status(HttpStatus.FORBIDDEN)
+          .body("Edit not allowed. Only sender can edit within 5 minutes.");
     }
   }
 
@@ -132,24 +138,24 @@ public class MessageController {
   }
 
   @GetMapping("/search")
-    public ResponseEntity<List<MessageDto>> searchMessages(
-            @RequestParam UUID chatId,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Instant startDate,
-            @RequestParam(required = false) Instant endDate) {
+  public ResponseEntity<List<MessageDto>> searchMessages(
+      @RequestParam UUID chatId,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) Instant startDate,
+      @RequestParam(required = false) Instant endDate) {
 
-        List<MessageDto> results;
+    List<MessageDto> results;
 
-        if (keyword != null && startDate != null && endDate != null) {
-            results = messageService.searchMessagesByKeywordAndDate(chatId, keyword, startDate, endDate);
-        } else if (keyword != null) {
-            results = messageService.searchMessagesByKeyword(chatId, keyword);
-        } else if (startDate != null && endDate != null) {
-            results = messageService.searchMessagesByDate(chatId, startDate, endDate);
-        } else {
-            results = Collections.emptyList();
-        }
-
-        return ResponseEntity.ok(results);
+    if (keyword != null && startDate != null && endDate != null) {
+      results = messageService.searchMessagesByKeywordAndDate(chatId, keyword, startDate, endDate);
+    } else if (keyword != null) {
+      results = messageService.searchMessagesByKeyword(chatId, keyword);
+    } else if (startDate != null && endDate != null) {
+      results = messageService.searchMessagesByDate(chatId, startDate, endDate);
+    } else {
+      results = Collections.emptyList();
     }
+
+    return ResponseEntity.ok(results);
+  }
 }

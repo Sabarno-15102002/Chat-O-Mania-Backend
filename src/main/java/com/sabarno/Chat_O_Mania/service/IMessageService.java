@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+
 import com.sabarno.Chat_O_Mania.dto.DeleteMessageRequestDto;
 import com.sabarno.Chat_O_Mania.dto.EditMessageRequestDto;
 import com.sabarno.Chat_O_Mania.dto.MessageDto;
@@ -11,7 +13,7 @@ import com.sabarno.Chat_O_Mania.dto.SendMessageRequestDto;
 
 public interface IMessageService {
 
-  List<MessageDto> getAllMessages(UUID chatId);
+  Page<MessageDto> getMessages(UUID chatId, int page, int size);
   MessageDto sendMessage(UUID senderId, SendMessageRequestDto request);
   List<UUID> getRecipientsInChat(UUID chatId);
   MessageDto editMessage(UUID senderId, EditMessageRequestDto request);
