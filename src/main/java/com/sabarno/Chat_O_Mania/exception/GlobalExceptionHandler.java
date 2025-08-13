@@ -64,4 +64,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         LocalDateTime.now());
     return new ResponseEntity<>(errorResponseDTO, HttpStatus.BAD_REQUEST);
   }
+
+  @ExceptionHandler(TooManyRequestsException.class)
+  public ResponseEntity<ErrorResponseDto> handleTooManyRequestsException(TooManyRequestsException exception, WebRequest webRequest) {
+    ErrorResponseDto errorResponseDTO = new ErrorResponseDto(
+        webRequest.getDescription(false),
+        HttpStatus.TOO_MANY_REQUESTS,
+        exception.getMessage(),
+        LocalDateTime.now());
+    return new ResponseEntity<>(errorResponseDTO, HttpStatus.TOO_MANY_REQUESTS);
+  }
 }

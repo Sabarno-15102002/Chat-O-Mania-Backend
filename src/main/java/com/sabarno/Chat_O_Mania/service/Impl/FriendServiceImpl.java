@@ -1,5 +1,6 @@
 package com.sabarno.Chat_O_Mania.service.Impl;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.stereotype.Service;
 
+import com.sabarno.Chat_O_Mania.config.RateLimiter;
 import com.sabarno.Chat_O_Mania.entity.FriendRequest;
 import com.sabarno.Chat_O_Mania.entity.RequestStatus;
 import com.sabarno.Chat_O_Mania.entity.User;
@@ -18,14 +20,17 @@ import com.sabarno.Chat_O_Mania.service.IFriendRequestService;
 @Service
 public class FriendServiceImpl implements IFriendRequestService {
 
-  @Autowired
-  private FriendRequestRepository friendRepo;
+    @Autowired
+    private FriendRequestRepository friendRepo;
 
-  @Autowired
-  private UserRepository userRepository;
+    @Autowired
+    private UserRepository userRepository;
 
-  @Autowired
-  private RedisCacheManager cacheManager;
+    @Autowired
+    private RedisCacheManager cacheManager;
+
+    @Autowired
+    private RateLimiter rateLimiter;
 
     /**
      * Sends a friend request from one user to another.
@@ -34,8 +39,12 @@ public class FriendServiceImpl implements IFriendRequestService {
      * @param receiverId the ID of the user receiving the request
      * @return the created FriendRequest object
      */
-  @Override
+    @Override
     public FriendRequest sendFriendRequest(UUID senderId, UUID receiverId) {
+
+        if(!rateLimiter.isAllowed("sendFriendRequest:" + senderId, 25, Duration.ofDays(1))) {
+            throw new RuntimeException("Too many friend requests sent. Please wait before trying again.");
+        }
         if (senderId.equals(receiverId)) {
             throw new IllegalArgumentException("You cannot send friend request to yourself.");
         }
@@ -78,7 +87,7 @@ public class FriendServiceImpl implements IFriendRequestService {
 
         User receiver = userRepository.findById(receiverId)
                 .orElseThrow(() -> new RuntimeException("Receiver not found"));
-        
+
         receiver.getFriends().add(request.getSender());
         request.getSender().getFriends().add(receiver);
 
@@ -111,7 +120,8 @@ public class FriendServiceImpl implements IFriendRequestService {
     }
 
     /**
-     *  Retrieves all pending friend requests for a user.
+     * Retrieves all pending friend requests for a user.
+     * 
      * @param userId the ID of the user whose pending requests are to be retrieved
      * @return a list of pending FriendRequest objects
      */
