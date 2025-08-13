@@ -12,6 +12,10 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -77,17 +81,22 @@ public class MessageServiceImpl implements IMessageService {
    * @return a list of MessageDto objects representing the messages in the chat
    */
   @Override
-  public List<MessageDto> getAllMessages(UUID chatId) {
+public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
     try {
-      List<Message> messages = messageRepository.findByChatId(chatId);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Message> messagesPage = messageRepository.findByChatId(chatId, pageable);
 
-      List<MessageDto> messageList = messages.stream().map(message -> MessageMapper.mapToMessageDto(message,
-          new MessageDto(), UserMapper.mapToUserDto(message.getSender(), new UserDto()))).collect(Collectors.toList());
-      return messageList;
+        return messagesPage.map(message -> 
+            MessageMapper.mapToMessageDto(
+                message, 
+                new MessageDto(), 
+                UserMapper.mapToUserDto(message.getSender(), new UserDto())
+            )
+        );
     } catch (Exception e) {
-      throw new GroupChatOperationException("Error retrieving messages for chat: " + e);
+        throw new GroupChatOperationException("Error retrieving messages for chat: " + e);
     }
-  }
+}
 
   /**
    * Sends a message in a chat.
