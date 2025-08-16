@@ -196,14 +196,24 @@ public class UserServiceImpl implements IUserService {
         .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
     try {
-      // Delete old profile picture if it exists
-      if (user.getProfilePicPublicId() != null && !user.getProfilePicPublicId().isBlank()) {
-        cloudinary.uploader().destroy(user.getProfilePicPublicId(), ObjectUtils.emptyMap());
-      }
-
       // Upload new picture using preset
       if (file.isEmpty()) {
         throw new NotValidDataException("File is empty");
+      }
+
+      String contentType = file.getContentType();
+        if (contentType == null || 
+            !(contentType.equals("image/jpeg") || contentType.equals("image/png"))) {
+            throw new NotValidDataException("Invalid file type. Only JPG, PNG are allowed.");
+        }
+
+        if (file.getSize() > 2 * 1024 * 1024) {
+            throw new NotValidDataException("File too large. Max allowed size is 2MB.");
+        }
+
+      // Delete old profile picture if it exists
+      if (user.getProfilePicPublicId() != null && !user.getProfilePicPublicId().isBlank()) {
+        cloudinary.uploader().destroy(user.getProfilePicPublicId(), ObjectUtils.emptyMap());
       }
 
       Map<String, Object> options = ObjectUtils.asMap(
@@ -253,6 +263,10 @@ public class UserServiceImpl implements IUserService {
 
     if (bio == null || bio.isBlank()) {
       throw new NotValidDataException("Bio cannot be empty");
+    }
+
+    if(bio.length() > 50){
+      throw new NotValidDataException("Bio cannot exceed 50 characters");
     }
 
     user.setBio(bio);
