@@ -6,9 +6,11 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
 
 import com.sabarno.Chat_O_Mania.entity.Chats;
 
+@Repository
 public interface ChatRepository  extends JpaRepository<Chats, UUID>{
 
   Optional<Chats> findByUsers_Id(UUID userId);
