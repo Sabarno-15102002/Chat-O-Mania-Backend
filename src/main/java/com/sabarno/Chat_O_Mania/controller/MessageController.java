@@ -161,13 +161,33 @@ public class MessageController {
   }
 
   @PostMapping("/forward/{messageId}/to/{chatId}")
-  public ResponseEntity<String> forwardMessage(@PathVariable UUID messageId, @PathVariable UUID chatId, Principal principal) {
-    if(principal == null) {
+  public ResponseEntity<String> forwardMessage(@PathVariable UUID messageId, @PathVariable UUID chatId,Principal principal) {
+    if (principal == null) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User is not authenticated");
     }
     UUID senderId = UUID.fromString(principal.getName());
     messageService.forwardMessage(messageId, chatId, senderId);
     return ResponseEntity.ok("Message forwarded.");
+  }
+
+  @PostMapping("/chats/{chatId}/messages/{messageId}/pin")
+  public ResponseEntity<?> pinMessage(@PathVariable UUID chatId, @PathVariable UUID messageId, Principal principal) {
+    if (principal == null) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User is not authenticated");
+    }
+    UUID userId = UUID.fromString(principal.getName());
+    messageService.pinMessage(messageId, userId);
+    return ResponseEntity.ok("Message pinned successfully");
+  }
+
+  @DeleteMapping("/chats/{chatId}/messages/{messageId}/unpin")
+  public ResponseEntity<?> unpinMessage(@PathVariable UUID chatId, @PathVariable UUID messageId, Principal principal) {
+    if (principal == null) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User is not authenticated");
+    }
+    UUID userId = UUID.fromString(principal.getName());
+    messageService.unpinMessage(messageId, userId);
+    return ResponseEntity.ok("Message unpinned successfully");
   }
 
 }

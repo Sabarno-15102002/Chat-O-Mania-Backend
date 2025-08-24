@@ -410,6 +410,12 @@ public class MessageServiceImpl implements IMessageService {
         .collect(Collectors.toList());
   }
 
+  /**
+   * Forwards a message to another chat.
+   * 
+   * @param messageId    the ID of the message to forward
+   * @param targetChatId the ID of the chat to which the message is forwarded
+   */
   @Override
   public void forwardMessage(UUID messageId, UUID targetChatId, UUID senderId) {
     User sender = userRepository.findById(senderId)
@@ -431,4 +437,56 @@ public class MessageServiceImpl implements IMessageService {
     messageRepository.save(forwarded);
   }
 
+  /**
+   * Pins a message in a chat.
+   * 
+   * @param messageId the ID of the message to pin
+   * @param userId the ID of the user attempting to pin the message
+   */
+  @Override
+  public void pinMessage(UUID messageId, UUID userId) {
+    User currentUser = userRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("User not found"));
+    Message msg = messageRepository.findById(messageId)
+        .orElseThrow(() -> new RuntimeException("Message not found"));
+
+    Chats chat = msg.getChat();
+
+    // ✅ Restrict to admins in group chats
+    if (chat.getIsGroupChat() && !chat.getGroupAdmins().contains(currentUser)) {
+      throw new RuntimeException("Only admins can pin messages in this group");
+    }
+
+    msg.setPinned(true);
+    chat.getPinnedMessages().add(msg);
+
+    messageRepository.save(msg);
+    chatRepository.save(chat);
+  }
+
+  /**
+   * Unpins a message in a chat.
+   * 
+   * @param messageId the ID of the message to unpin
+   * @param userId the ID of the user attempting to unpin the message
+   */
+  @Override
+  public void unpinMessage(UUID messageId, UUID userId) {
+    User currentUser = userRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("User not found"));
+    Message msg = messageRepository.findById(messageId)
+        .orElseThrow(() -> new RuntimeException("Message not found"));
+
+    Chats chat = msg.getChat();
+
+    if (chat.getIsGroupChat() && !chat.getGroupAdmins().contains(currentUser)) {
+      throw new RuntimeException("Only admins can unpin messages in this group");
+    }
+
+    msg.setPinned(false);
+    chat.getPinnedMessages().remove(msg);
+
+    messageRepository.save(msg);
+    chatRepository.save(chat);
+  }
 }

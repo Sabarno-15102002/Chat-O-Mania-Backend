@@ -1,7 +1,9 @@
 package com.sabarno.Chat_O_Mania.entity;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -68,4 +70,9 @@ public class Chats extends BaseEntity {
    * Description of the chat.
    */
   private String chatDescription;
+
+  @OneToMany
+  @JoinTable(name = "chat_pinned_messages", joinColumns = @JoinColumn(name = "chat_id"), inverseJoinColumns = @JoinColumn(name = "message_id"))
+  private Set<Message> pinnedMessages = new HashSet<>();
+
 }

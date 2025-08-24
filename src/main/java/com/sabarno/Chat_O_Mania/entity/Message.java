@@ -87,4 +87,9 @@ public class Message extends BaseEntity {
   @ManyToOne
   @JoinColumn(name = "forwarded_from_message_id")
   private Message forwardedFrom;
+
+  /**
+   * Indicates whether the message is pinned.
+   */
+  private Boolean pinned = false;
 }
