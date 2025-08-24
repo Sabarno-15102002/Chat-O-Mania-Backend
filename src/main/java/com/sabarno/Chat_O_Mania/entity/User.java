@@ -104,4 +104,11 @@ public class User extends BaseEntity {
   @ManyToMany
   @JoinTable(name = "user_friends", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "friend_id"))
   private Set<User> friends = new HashSet<>();
+
+  /**
+   * The set of users blocked by this user.
+   */
+  @ManyToMany
+  @JoinTable(name = "user_blocked", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "blocked_user_id"))
+  private Set<User> blockedUsers = new HashSet<>();
 }

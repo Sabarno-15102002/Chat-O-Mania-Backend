@@ -31,6 +31,7 @@ import com.sabarno.Chat_O_Mania.dto.UserDto;
 import com.sabarno.Chat_O_Mania.entity.Chats;
 import com.sabarno.Chat_O_Mania.entity.Message;
 import com.sabarno.Chat_O_Mania.entity.User;
+import com.sabarno.Chat_O_Mania.exception.BlockedUserException;
 import com.sabarno.Chat_O_Mania.exception.GroupChatOperationException;
 import com.sabarno.Chat_O_Mania.exception.NotValidDataException;
 import com.sabarno.Chat_O_Mania.exception.ResourceNotFoundException;
@@ -81,22 +82,19 @@ public class MessageServiceImpl implements IMessageService {
    * @return a list of MessageDto objects representing the messages in the chat
    */
   @Override
-public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
+  public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
     try {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Message> messagesPage = messageRepository.findByChatId(chatId, pageable);
+      Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+      Page<Message> messagesPage = messageRepository.findByChatId(chatId, pageable);
 
-        return messagesPage.map(message -> 
-            MessageMapper.mapToMessageDto(
-                message, 
-                new MessageDto(), 
-                UserMapper.mapToUserDto(message.getSender(), new UserDto())
-            )
-        );
+      return messagesPage.map(message -> MessageMapper.mapToMessageDto(
+          message,
+          new MessageDto(),
+          UserMapper.mapToUserDto(message.getSender(), new UserDto())));
     } catch (Exception e) {
-        throw new GroupChatOperationException("Error retrieving messages for chat: " + e);
+      throw new GroupChatOperationException("Error retrieving messages for chat: " + e);
     }
-}
+  }
 
   /**
    * Sends a message in a chat.
@@ -108,7 +106,7 @@ public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
   @Override
   public MessageDto sendMessage(UUID senderId, SendMessageRequestDto request) {
 
-    if(!rateLimiter.isAllowed("sendMessage:" + senderId, 10, Duration.ofSeconds(30))) {
+    if (!rateLimiter.isAllowed("sendMessage:" + senderId, 10, Duration.ofSeconds(30))) {
       throw new RuntimeException("Too many messages sent. Please wait before trying again.");
     }
     // 1. Validate
@@ -122,6 +120,23 @@ public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
 
     Chats chat = chatRepository.findById(request.getChatId())
         .orElseThrow(() -> new ResourceNotFoundException("Chat not found"));
+
+    if (chat.getIsGroupChat() && !chat.getUsers().contains(sender)) {
+      throw new GroupChatOperationException("You are not a member of this group chat.");
+    }
+    if (!chat.getIsGroupChat()) {
+      // 🚨 Blocking checks
+      User receiver = chat.getUsers().stream()
+          .filter(user -> !user.getId().equals(senderId))
+          .findFirst()
+          .orElseThrow(() -> new ResourceNotFoundException("No other user in chat"));
+      if (receiver.getBlockedUsers().contains(sender)) {
+        throw new BlockedUserException("You are blocked by this user.");
+      }
+      if (sender.getBlockedUsers().contains(receiver)) {
+        throw new BlockedUserException("You have blocked this user. Unblock to send messages.");
+      }
+    }
 
     Message message = new Message();
     message.setSender(sender);
@@ -153,23 +168,23 @@ public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
 
     message.setChat(chat);
 
-    if(chat.getIsGroupChat()) {
+    if (chat.getIsGroupChat()) {
       // For group chats, update the latest messages in the cache
       Cache cache = cacheManager.getCache("groupChatInfo");
-      if( cache != null) {
+      if (cache != null) {
         cache.evict(chat.getId().toString() + "-" + senderId.toString());
         cache.put(chat.getId().toString() + "-" + senderId.toString(), chat.getLatestMessages());
       }
-      
+
     } else {
       // For one-to-one chats, update the cache with the latest message
       Cache cache = cacheManager.getCache("oneToOneChat");
-      if (cache != null){
+      if (cache != null) {
         cache.put(senderId.toString() + "-" + chat.getUsers().stream()
-              .filter(user -> !user.getId().equals(senderId))
-              .findFirst()
-              .orElseThrow(() -> new ResourceNotFoundException("No other user in chat"))
-              .getId(), chat.getLatestMessages());
+            .filter(user -> !user.getId().equals(senderId))
+            .findFirst()
+            .orElseThrow(() -> new ResourceNotFoundException("No other user in chat"))
+            .getId(), chat.getLatestMessages());
       }
     }
 
@@ -236,14 +251,13 @@ public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
       messageRepository.save(message);
       notifyClientsOfEdit(message);
       // Update the cache
-      if( message.getChat().getIsGroupChat()) {
+      if (message.getChat().getIsGroupChat()) {
         Cache cache = cacheManager.getCache("groupChatInfo");
         if (cache != null) {
           cache.evict(message.getChat().getId().toString() + "-" + senderId.toString());
           cache.put(message.getChat().getId().toString() + "-" + senderId.toString(), message);
         }
-      }
-      else {
+      } else {
         Cache cache = cacheManager.getCache("oneToOneChat");
         if (cache != null) {
           cache.put(senderId.toString() + "-" + message.getChat().getUsers().stream()
@@ -293,7 +307,7 @@ public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
             request.getMessageId());
       }
       // Update the cache
-      if( isGroup) {
+      if (isGroup) {
         Cache cache = cacheManager.getCache("groupChatInfo");
         if (cache != null) {
           cache.evict(chat.getId().toString() + "-" + senderId.toString());
@@ -372,7 +386,7 @@ public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
    */
   @Override
   public List<MessageDto> searchMessagesByKeyword(UUID chatId, String keyword) {
-    List<Message> messages = messageRepository.searchMessagesByKeyword (chatId, keyword);
+    List<Message> messages = messageRepository.searchMessagesByKeyword(chatId, keyword);
     return messages.stream()
         .map(message -> MessageMapper.mapToMessageDto(message, new MessageDto(),
             UserMapper.mapToUserDto(message.getSender(), new UserDto())))
@@ -382,9 +396,9 @@ public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
   /**
    * Searches messages by date range.
    *
-   * @param chatId     the ID of the chat to search in
-   * @param startDate  the start date of the range
-   * @param endDate    the end date of the range
+   * @param chatId    the ID of the chat to search in
+   * @param startDate the start date of the range
+   * @param endDate   the end date of the range
    * @return a list of MessageDto objects matching the date range
    */
   @Override
@@ -396,5 +410,4 @@ public Page<MessageDto> getMessages(UUID chatId, int page, int size) {
         .collect(Collectors.toList());
   }
 
-  
 }

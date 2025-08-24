@@ -28,4 +28,6 @@ public interface IUserService {
     List<UserDto> getFriends(UUID userId);
     List<UserDto> searchUsers(String query, UUID userId);
     boolean removeFriend(UUID userId, UUID friendId);
+    void blockUser(UUID userId, UUID targetUuid);
+    void unblockUser(UUID userId, UUID blockeUuid);
 }

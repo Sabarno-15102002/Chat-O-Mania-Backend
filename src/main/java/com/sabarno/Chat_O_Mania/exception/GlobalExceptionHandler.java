@@ -74,4 +74,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         LocalDateTime.now());
     return new ResponseEntity<>(errorResponseDTO, HttpStatus.TOO_MANY_REQUESTS);
   }
+
+  @ExceptionHandler(BlockedUserException.class)
+  public ResponseEntity<ErrorResponseDto> handleBlockedUserException(BlockedUserException exception, WebRequest webRequest) {
+    ErrorResponseDto errorResponseDTO = new ErrorResponseDto(
+        webRequest.getDescription(false),
+        HttpStatus.FORBIDDEN,
+        exception.getMessage(),
+        LocalDateTime.now());
+    return new ResponseEntity<>(errorResponseDTO, HttpStatus.FORBIDDEN);
+  }
 }

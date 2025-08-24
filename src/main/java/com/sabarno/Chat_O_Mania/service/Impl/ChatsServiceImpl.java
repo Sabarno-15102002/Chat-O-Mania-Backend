@@ -103,6 +103,16 @@ public class ChatsServiceImpl implements IChatsService {
       if (!chats.isEmpty()) {
         Chats chat = chats.get(0);
         List<User> users = chat.getUsers();
+        User targetUser = userRepository.findById(targetUserId.getTargetUserId())
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Target user not found with ID: " + targetUserId.getTargetUserId()));
+        users.remove(targetUser);
+        if(targetUser.getBlockedUsers().stream().anyMatch(user -> user.getId().equals(requestingUserId))){
+          // 🚨 Hide profile pic + lastSeen if blocked
+          targetUser.setProfilePicUrl(null);
+          targetUser.setLastSeen(null);
+        }
+        users.add(targetUser);
         userDtos = users.stream()
             .map(user -> UserMapper.mapToUserDto(user, new UserDto()))
             .toList();
@@ -125,6 +135,13 @@ public class ChatsServiceImpl implements IChatsService {
         chatRepository.save(newChat);
 
         List<User> users = newChat.getUsers();
+        users.remove(user1);
+        if(user2.getBlockedUsers().stream().anyMatch(user -> user.getId().equals(requestingUserId))){
+          // 🚨 Hide profile pic + lastSeen if blocked
+          user2.setProfilePicUrl(null);
+          user2.setLastSeen(null);
+        }
+        users.add(user2);
         userDtos = users.stream()
             .map(user -> UserMapper.mapToUserDto(user, new UserDto()))
             .toList();

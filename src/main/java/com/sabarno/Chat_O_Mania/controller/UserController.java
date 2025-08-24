@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -209,6 +210,25 @@ public class UserController {
       return ResponseEntity.status(500).body("Failed to remove friend. Please try again later.");
     }
   }
+  @PostMapping("/block/{userId}")
+    public ResponseEntity<String> blockUser(@PathVariable UUID targetUuid, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build(); // Unauthorized
+        }
+        UUID userId = UUID.fromString(principal.getName());
+        userService.blockUser(userId, targetUuid);
+        return ResponseEntity.ok("User blocked successfully.");
+    }
+
+    @PostMapping("/unblock/{userId}")
+    public ResponseEntity<String> unblockUser(@PathVariable UUID blockedUuid, Principal principal) {
+      if (principal == null) {
+            return ResponseEntity.status(401).build(); // Unauthorized
+        }
+        UUID userId = UUID.fromString(principal.getName());
+        userService.unblockUser(userId, blockedUuid);
+        return ResponseEntity.ok("User unblocked successfully.");
+    }
 }
 
 // Testing Done ✅

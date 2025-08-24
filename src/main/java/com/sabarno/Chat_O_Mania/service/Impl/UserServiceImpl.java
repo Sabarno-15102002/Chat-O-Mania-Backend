@@ -59,7 +59,7 @@ public class UserServiceImpl implements IUserService {
    */
   @Override
   public List<User> getAllUsers() {
-    return null; //TODO: Implement this method to return all users
+    return null; // TODO: Implement this method to return all users
   }
 
   /**
@@ -95,7 +95,7 @@ public class UserServiceImpl implements IUserService {
   @Override
   public LoginResponseDto loginUser(String email, String password) {
     if (!rateLimiter.isAllowed("login:" + email, 5, Duration.ofMinutes(5))) {
-        throw new TooManyRequestsException("Too many login attempts. Please wait and try again.");
+      throw new TooManyRequestsException("Too many login attempts. Please wait and try again.");
     }
     User user = userRepository.findByEmail(email)
         .orElseThrow(() -> new NotValidDataException("Invalid email or password"));
@@ -140,8 +140,8 @@ public class UserServiceImpl implements IUserService {
   /**
    * Updates the password for a user.
    *
-   * @param userId      the ID of the user whose password is to be updated
-   * @param requestDto  the request containing old and new passwords
+   * @param userId     the ID of the user whose password is to be updated
+   * @param requestDto the request containing old and new passwords
    * @return true if the password was updated successfully, false otherwise
    */
   @Override
@@ -202,14 +202,14 @@ public class UserServiceImpl implements IUserService {
       }
 
       String contentType = file.getContentType();
-        if (contentType == null || 
-            !(contentType.equals("image/jpeg") || contentType.equals("image/png"))) {
-            throw new NotValidDataException("Invalid file type. Only JPG, PNG are allowed.");
-        }
+      if (contentType == null ||
+          !(contentType.equals("image/jpeg") || contentType.equals("image/png"))) {
+        throw new NotValidDataException("Invalid file type. Only JPG, PNG are allowed.");
+      }
 
-        if (file.getSize() > 2 * 1024 * 1024) {
-            throw new NotValidDataException("File too large. Max allowed size is 2MB.");
-        }
+      if (file.getSize() > 2 * 1024 * 1024) {
+        throw new NotValidDataException("File too large. Max allowed size is 2MB.");
+      }
 
       // Delete old profile picture if it exists
       if (user.getProfilePicPublicId() != null && !user.getProfilePicPublicId().isBlank()) {
@@ -265,7 +265,7 @@ public class UserServiceImpl implements IUserService {
       throw new NotValidDataException("Bio cannot be empty");
     }
 
-    if(bio.length() > 50){
+    if (bio.length() > 50) {
       throw new NotValidDataException("Bio cannot exceed 50 characters");
     }
 
@@ -288,6 +288,7 @@ public class UserServiceImpl implements IUserService {
         .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
     return user.getFriends().stream()
+        .filter(friend -> !user.getBlockedUsers().contains(friend) && !friend.getBlockedUsers().contains(user))
         .map(friend -> UserMapper.mapToUserDto(friend, new UserDto()))
         .toList();
   }
@@ -306,9 +307,12 @@ public class UserServiceImpl implements IUserService {
     }
 
     List<User> users = userRepository.findByUsernameContainingIgnoreCase(query);
-    
+    User currentUser = userRepository.findById(userId)
+        .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
     return users.stream()
         .filter(user -> !user.getId().equals(userId)) // Exclude the current user
+        .filter(user -> !currentUser.getBlockedUsers().contains(user) && !user.getBlockedUsers().contains(currentUser))
         .map(user -> UserMapper.mapToUserDto(user, new UserDto()))
         .toList();
   }
@@ -316,8 +320,8 @@ public class UserServiceImpl implements IUserService {
   /**
    * Removes a friend from the user's friend list.
    *
-   * @param userId    the ID of the user removing the friend
-   * @param friendId  the ID of the friend to be removed
+   * @param userId   the ID of the user removing the friend
+   * @param friendId the ID of the friend to be removed
    * @return true if the friend was removed successfully, false otherwise
    */
   @Override
@@ -339,5 +343,24 @@ public class UserServiceImpl implements IUserService {
     cacheManager.getCache("userFriends").evict(userId);
     cacheManager.getCache("userFriends").put(userId, friend);
     return true;
+  }
+
+  @Override
+  public void blockUser(UUID userId, UUID targetUuid) {
+    User currentUser = userRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("User not found"));
+    User blockedUser = userRepository.findById(targetUuid)
+        .orElseThrow(() -> new RuntimeException("User not found"));
+
+    currentUser.getBlockedUsers().add(blockedUser);
+    userRepository.save(currentUser);
+  }
+
+  @Override
+  public void unblockUser(UUID userId, UUID blockedUserId) {
+    User currentUser = userRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("User not found"));
+    currentUser.getBlockedUsers().removeIf(u -> u.getId().equals(blockedUserId));
+    userRepository.save(currentUser);
   }
 }
