@@ -28,25 +28,41 @@ public class MessageDto {
 
   /**
    * Name of the chat to which the message belongs.
-   * This field is nullable and can be used to identify the chat in which the message was sent.
+   * This field is nullable and can be used to identify the chat in which the
+   * message was sent.
    */
   private String chatName;
 
   /**
    * Unique identifier of the chat to which the message belongs.
-   * This field is nullable and can be used to identify the chat in which the message was sent.
+   * This field is nullable and can be used to identify the chat in which the
+   * message was sent.
    */
   private UUID chatId;
 
   /**
    * URL of the media associated with the message.
-   * This field is nullable and can be used to store the URL of any media (like images, videos, etc.) sent with the message.
+   * This field is nullable and can be used to store the URL of any media (like
+   * images, videos, etc.) sent with the message.
    */
   private String mediaUrl;
 
   /**
    * Public ID of the media associated with the message.
-   * This field is nullable and can be used to store the public ID of any media (like images, videos, etc.) sent with the message.
+   * This field is nullable and can be used to store the public ID of any media
+   * (like images, videos, etc.) sent with the message.
    */
   private String mediaType;
+
+  /**
+   * Forwarded from message ID, if the message was forwarded.
+   * This field is nullable and can be used to identify the original message
+   */
+  private UUID forwardedFromId;
+
+  /**
+   * Username of the sender from whom this message was forwarded, if applicable.
+   * This field is nullable and can be used to identify the original sender.
+   */
+  private String forwardedFromUsername;
 }

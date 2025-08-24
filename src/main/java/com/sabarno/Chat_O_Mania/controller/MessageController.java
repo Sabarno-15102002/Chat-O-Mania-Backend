@@ -14,6 +14,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -158,4 +159,15 @@ public class MessageController {
 
     return ResponseEntity.ok(results);
   }
+
+  @PostMapping("/forward/{messageId}/to/{chatId}")
+  public ResponseEntity<String> forwardMessage(@PathVariable UUID messageId, @PathVariable UUID chatId, Principal principal) {
+    if(principal == null) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User is not authenticated");
+    }
+    UUID senderId = UUID.fromString(principal.getName());
+    messageService.forwardMessage(messageId, chatId, senderId);
+    return ResponseEntity.ok("Message forwarded.");
+  }
+
 }

@@ -14,8 +14,9 @@ public class MessageMapper {
     messageDto.setChatId(message.getChat().getId());
     messageDto.setMediaUrl(message.getMediaUrl());
     messageDto.setMediaType(message.getMediaType());
-    return messageDto;
-    
-  }
+    messageDto.setForwardedFromId(message.getForwardedFrom() != null ? message.getForwardedFrom().getId() : null);
+    messageDto.setForwardedFromUsername(message.getForwardedFrom() != null ? message.getForwardedFrom().getSender().getUsername() : null);
 
+    return messageDto;
+  }
 }

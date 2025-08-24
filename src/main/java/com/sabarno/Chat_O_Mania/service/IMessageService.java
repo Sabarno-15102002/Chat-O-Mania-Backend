@@ -22,4 +22,5 @@ public interface IMessageService {
   List<MessageDto> searchMessagesByKeywordAndDate(UUID chatId, String keyword, Instant startDate, Instant endDate);
   List<MessageDto> searchMessagesByKeyword(UUID chatId, String keyword);
   List<MessageDto> searchMessagesByDate(UUID chatId, Instant startDate, Instant endDate);
+  void forwardMessage(UUID messageId, UUID chatId, UUID senderId);
 }

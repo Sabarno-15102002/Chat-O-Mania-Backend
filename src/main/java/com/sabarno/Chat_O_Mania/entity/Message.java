@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -79,4 +80,11 @@ public class Message extends BaseEntity {
    * The timestamp when the message was delivered.
    */
   private Instant deliveredAt;
+
+  /**
+   * The message from which this message was forwarded, if applicable.
+   */
+  @ManyToOne
+  @JoinColumn(name = "forwarded_from_message_id")
+  private Message forwardedFrom;
 }

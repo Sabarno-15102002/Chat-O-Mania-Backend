@@ -410,4 +410,25 @@ public class MessageServiceImpl implements IMessageService {
         .collect(Collectors.toList());
   }
 
+  @Override
+  public void forwardMessage(UUID messageId, UUID targetChatId, UUID senderId) {
+    User sender = userRepository.findById(senderId)
+        .orElseThrow(() -> new ResourceNotFoundException("Sender not found"));
+
+    Message original = messageRepository.findById(messageId)
+        .orElseThrow(() -> new RuntimeException("Original message not found"));
+
+    Chats targetChat = chatRepository.findById(targetChatId)
+        .orElseThrow(() -> new RuntimeException("Target chat not found"));
+
+    Message forwarded = new Message();
+    forwarded.setSender(sender);
+    forwarded.setChat(targetChat);
+    forwarded.setContent(original.getContent()); // Copy text
+    forwarded.setForwardedFrom(original); // Reference to original
+    forwarded.setDeliveredAt(Instant.now());
+
+    messageRepository.save(forwarded);
+  }
+
 }
