@@ -71,7 +71,7 @@ public class UserServiceImpl implements IUserService {
   @Override
   public UserDto registerUser(RegisterRequestDto request) {
     if (userRepository.existsByEmail(request.getEmail())) {
-      throw new RuntimeException("User already exists with email: " + request.getEmail());
+      throw new NotValidDataException("User already exists with email: " + request.getEmail());
     }
 
     User user = new User();
@@ -348,9 +348,9 @@ public class UserServiceImpl implements IUserService {
   @Override
   public void blockUser(UUID userId, UUID targetUuid) {
     User currentUser = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     User blockedUser = userRepository.findById(targetUuid)
-        .orElseThrow(() -> new RuntimeException("User not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
     currentUser.getBlockedUsers().add(blockedUser);
     userRepository.save(currentUser);
@@ -359,7 +359,7 @@ public class UserServiceImpl implements IUserService {
   @Override
   public void unblockUser(UUID userId, UUID blockedUserId) {
     User currentUser = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     currentUser.getBlockedUsers().removeIf(u -> u.getId().equals(blockedUserId));
     userRepository.save(currentUser);
   }

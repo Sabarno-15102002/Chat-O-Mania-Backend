@@ -35,6 +35,7 @@ import com.sabarno.Chat_O_Mania.exception.BlockedUserException;
 import com.sabarno.Chat_O_Mania.exception.GroupChatOperationException;
 import com.sabarno.Chat_O_Mania.exception.NotValidDataException;
 import com.sabarno.Chat_O_Mania.exception.ResourceNotFoundException;
+import com.sabarno.Chat_O_Mania.exception.TooManyRequestsException;
 import com.sabarno.Chat_O_Mania.mapper.MessageMapper;
 import com.sabarno.Chat_O_Mania.mapper.UserMapper;
 import com.sabarno.Chat_O_Mania.repository.ChatRepository;
@@ -107,7 +108,7 @@ public class MessageServiceImpl implements IMessageService {
   public MessageDto sendMessage(UUID senderId, SendMessageRequestDto request) {
 
     if (!rateLimiter.isAllowed("sendMessage:" + senderId, 10, Duration.ofSeconds(30))) {
-      throw new RuntimeException("Too many messages sent. Please wait before trying again.");
+      throw new TooManyRequestsException("Too many messages sent. Please wait before trying again.");
     }
     // 1. Validate
     if (request.getChatId() == null
@@ -422,10 +423,10 @@ public class MessageServiceImpl implements IMessageService {
         .orElseThrow(() -> new ResourceNotFoundException("Sender not found"));
 
     Message original = messageRepository.findById(messageId)
-        .orElseThrow(() -> new RuntimeException("Original message not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Original message not found"));
 
     Chats targetChat = chatRepository.findById(targetChatId)
-        .orElseThrow(() -> new RuntimeException("Target chat not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Target chat not found"));
 
     Message forwarded = new Message();
     forwarded.setSender(sender);
@@ -446,15 +447,15 @@ public class MessageServiceImpl implements IMessageService {
   @Override
   public void pinMessage(UUID messageId, UUID userId) {
     User currentUser = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     Message msg = messageRepository.findById(messageId)
-        .orElseThrow(() -> new RuntimeException("Message not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
 
     Chats chat = msg.getChat();
 
     // ✅ Restrict to admins in group chats
     if (chat.getIsGroupChat() && !chat.getGroupAdmins().contains(currentUser)) {
-      throw new RuntimeException("Only admins can pin messages in this group");
+      throw new GroupChatOperationException("Only admins can pin messages in this group");
     }
 
     msg.setPinned(true);
@@ -473,14 +474,14 @@ public class MessageServiceImpl implements IMessageService {
   @Override
   public void unpinMessage(UUID messageId, UUID userId) {
     User currentUser = userRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("User not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     Message msg = messageRepository.findById(messageId)
-        .orElseThrow(() -> new RuntimeException("Message not found"));
+        .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
 
     Chats chat = msg.getChat();
 
     if (chat.getIsGroupChat() && !chat.getGroupAdmins().contains(currentUser)) {
-      throw new RuntimeException("Only admins can unpin messages in this group");
+      throw new GroupChatOperationException("Only admins can unpin messages in this group");
     }
 
     msg.setPinned(false);

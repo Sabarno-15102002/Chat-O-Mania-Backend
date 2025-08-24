@@ -13,6 +13,9 @@ import com.sabarno.Chat_O_Mania.config.RateLimiter;
 import com.sabarno.Chat_O_Mania.entity.FriendRequest;
 import com.sabarno.Chat_O_Mania.entity.RequestStatus;
 import com.sabarno.Chat_O_Mania.entity.User;
+import com.sabarno.Chat_O_Mania.exception.NotValidDataException;
+import com.sabarno.Chat_O_Mania.exception.ResourceNotFoundException;
+import com.sabarno.Chat_O_Mania.exception.TooManyRequestsException;
 import com.sabarno.Chat_O_Mania.repository.FriendRequestRepository;
 import com.sabarno.Chat_O_Mania.repository.UserRepository;
 import com.sabarno.Chat_O_Mania.service.IFriendRequestService;
@@ -43,21 +46,21 @@ public class FriendServiceImpl implements IFriendRequestService {
     public FriendRequest sendFriendRequest(UUID senderId, UUID receiverId) {
 
         if(!rateLimiter.isAllowed("sendFriendRequest:" + senderId, 25, Duration.ofDays(1))) {
-            throw new RuntimeException("Too many friend requests sent. Please wait before trying again.");
+            throw new TooManyRequestsException("Too many friend requests sent. Please wait before trying again.");
         }
         if (senderId.equals(receiverId)) {
             throw new IllegalArgumentException("You cannot send friend request to yourself.");
         }
 
         User sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new RuntimeException("Sender not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Sender not found"));
         User receiver = userRepository.findById(receiverId)
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Receiver not found"));
 
         // Check if a request already exists
         Optional<FriendRequest> existingRequest = friendRepo.findBySenderAndReceiver(sender, receiver);
         if (existingRequest.isPresent()) {
-            throw new RuntimeException("Friend request already sent.");
+            throw new NotValidDataException("Friend request already sent.");
         }
 
         FriendRequest request = new FriendRequest();
@@ -79,14 +82,14 @@ public class FriendServiceImpl implements IFriendRequestService {
     @Override
     public boolean acceptFriendRequest(UUID requestId, UUID receiverId) {
         FriendRequest request = friendRepo.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Friend request not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Friend request not found"));
 
         if (!request.getReceiver().getId().equals(receiverId)) {
-            throw new RuntimeException("You are not authorized to accept this request");
+            throw new ResourceNotFoundException("You are not authorized to accept this request");
         }
 
         User receiver = userRepository.findById(receiverId)
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Receiver not found"));
 
         receiver.getFriends().add(request.getSender());
         request.getSender().getFriends().add(receiver);
@@ -108,10 +111,10 @@ public class FriendServiceImpl implements IFriendRequestService {
     @Override
     public boolean rejectFriendRequest(UUID requestId, UUID receiverId) {
         FriendRequest request = friendRepo.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Friend request not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Friend request not found"));
 
         if (!request.getReceiver().getId().equals(receiverId)) {
-            throw new RuntimeException("You are not authorized to reject this request");
+            throw new ResourceNotFoundException("You are not authorized to reject this request");
         }
 
         request.setStatus(RequestStatus.REJECTED);
@@ -128,7 +131,7 @@ public class FriendServiceImpl implements IFriendRequestService {
     @Override
     public List<FriendRequest> getPendingRequests(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         return friendRepo.findByReceiverAndStatus(user, RequestStatus.PENDING);
     }
