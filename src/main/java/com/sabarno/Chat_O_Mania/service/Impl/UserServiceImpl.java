@@ -345,6 +345,13 @@ public class UserServiceImpl implements IUserService {
     return true;
   }
 
+  /**
+   * Blocks a user.
+   * 
+   * @param userId     the ID of the user performing the block
+   * @param targetUuid the ID of the user to be blocked
+   * 
+   */
   @Override
   public void blockUser(UUID userId, UUID targetUuid) {
     User currentUser = userRepository.findById(userId)
@@ -356,6 +363,13 @@ public class UserServiceImpl implements IUserService {
     userRepository.save(currentUser);
   }
 
+  /**
+   * Unblocks a user.
+   * 
+   * @param userId        the ID of the user performing the unblock
+   * @param blockedUserId the ID of the user to be unblocked
+   * 
+   */
   @Override
   public void unblockUser(UUID userId, UUID blockedUserId) {
     User currentUser = userRepository.findById(userId)

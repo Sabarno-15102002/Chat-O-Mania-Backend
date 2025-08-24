@@ -138,6 +138,13 @@ public class MessageController {
     return ResponseEntity.ok(success);
   }
 
+  @Operation(summary = "Search messages", description = "Searches messages in a chat by keyword and/or date range.")
+  @ApiResponses(value = { 
+      @ApiResponse(responseCode = "200", description = "Successfully retrieved search results"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid chat ID or date range"),
+      @ApiResponse(responseCode = "404", description = "Chat not found with the provided ID"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @GetMapping("/search")
   public ResponseEntity<List<MessageDto>> searchMessages(
       @RequestParam UUID chatId,
@@ -160,6 +167,13 @@ public class MessageController {
     return ResponseEntity.ok(results);
   }
 
+  @Operation(summary = "Forward a message", description = "Forwards a message to another chat.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Message forwarded successfully"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid message ID or chat ID"),
+      @ApiResponse(responseCode = "404", description = "Message or chat not found with the provided ID"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @PostMapping("/forward/{messageId}/to/{chatId}")
   public ResponseEntity<String> forwardMessage(@PathVariable UUID messageId, @PathVariable UUID chatId,Principal principal) {
     if (principal == null) {
@@ -170,6 +184,13 @@ public class MessageController {
     return ResponseEntity.ok("Message forwarded.");
   }
 
+  @Operation(summary = "Pin a message", description = "Pins a message in a chat.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Message pinned successfully"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid message ID or chat ID"),
+      @ApiResponse(responseCode = "404", description = "Message or chat not found with the provided ID"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @PostMapping("/chats/{chatId}/messages/{messageId}/pin")
   public ResponseEntity<?> pinMessage(@PathVariable UUID chatId, @PathVariable UUID messageId, Principal principal) {
     if (principal == null) {
@@ -180,6 +201,13 @@ public class MessageController {
     return ResponseEntity.ok("Message pinned successfully");
   }
 
+  @Operation(summary = "Unpin a message", description = "Unpins a message in a chat.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Message unpinned successfully"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid message ID or chat ID"),
+      @ApiResponse(responseCode = "404", description = "Message or chat not found with the provided ID"),
+      @ApiResponse(responseCode = "401", description = "Unauthorized - User is not authenticated")
+  })
   @DeleteMapping("/chats/{chatId}/messages/{messageId}/unpin")
   public ResponseEntity<?> unpinMessage(@PathVariable UUID chatId, @PathVariable UUID messageId, Principal principal) {
     if (principal == null) {

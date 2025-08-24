@@ -210,6 +210,14 @@ public class UserController {
       return ResponseEntity.status(500).body("Failed to remove friend. Please try again later.");
     }
   }
+
+  @Operation(summary = "Block a user", description = "Blocks a user, preventing them from interacting with the currently logged-in user.")
+  @ApiResponses(value = {
+      @ApiResponse(responseCode = "200", description = "Successfully blocked user"),
+      @ApiResponse(responseCode = "400", description = "Bad request - Invalid request parameters or trying to block self"),
+      @ApiResponse(responseCode = "404", description = "User to be blocked not found"),
+      @ApiResponse(responseCode = "500", description = "Internal server error - Failed to block user")
+  })
   @PostMapping("/block/{userId}")
     public ResponseEntity<String> blockUser(@PathVariable UUID targetUuid, Principal principal) {
         if (principal == null) {
@@ -220,6 +228,13 @@ public class UserController {
         return ResponseEntity.ok("User blocked successfully.");
     }
 
+    @Operation(summary = "Unblock a user", description = "Unblocks a previously blocked user, allowing them to interact with the currently logged-in user.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully unblocked user"),
+        @ApiResponse(responseCode = "400", description = "Bad request - Invalid request parameters or trying to unblock self"),
+        @ApiResponse(responseCode = "404", description = "User to be unblocked not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error - Failed to unblock user")
+    })
     @PostMapping("/unblock/{userId}")
     public ResponseEntity<String> unblockUser(@PathVariable UUID blockedUuid, Principal principal) {
       if (principal == null) {
@@ -230,9 +245,3 @@ public class UserController {
         return ResponseEntity.ok("User unblocked successfully.");
     }
 }
-
-// Testing Done ✅
-
-// Pending tasks:
-// 1. Methods for user deletion, password reset, etc. can be added here as
-// needed.
