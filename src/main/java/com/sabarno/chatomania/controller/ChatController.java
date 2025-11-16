@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -94,6 +95,17 @@ public class ChatController {
     ) throws UserException, ChatException{
         User user = userService.findUserProfile(token);
         Chat chat = chatService.removeUserFromGroup(userId, chatId, user);
+        return new ResponseEntity<>(chat, HttpStatus.OK);
+    }
+
+    @PatchMapping("/update/{chatId}")
+    public ResponseEntity<Chat> renameGroupHandler(
+        @PathVariable UUID chatId,
+        @RequestBody String newName,
+        @RequestHeader("Authorization") String token
+    ) throws ChatException, UserException{
+        User user = userService.findUserProfile(token);
+        Chat chat = chatService.renameGroupChat(newName, chatId, user);
         return new ResponseEntity<>(chat, HttpStatus.OK);
     }
 
