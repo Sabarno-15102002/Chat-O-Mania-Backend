@@ -27,8 +27,12 @@ import com.sabarno.chatomania.response.ApiResponse;
 import com.sabarno.chatomania.service.ChatService;
 import com.sabarno.chatomania.service.UserService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @RestController
 @RequestMapping("/api/chats")
+@Tag(name = "Chat Controller", description = "APIs for managing chats and groups")
 public class ChatController {
 
     @Autowired
@@ -37,7 +41,7 @@ public class ChatController {
     @Autowired
     private UserService userService;
 
-
+    @Operation(summary = "Create a new single chat", description = "Creates a new single chat between the requesting user and another user")
     @PostMapping("/create/single")
     public ResponseEntity<Chat> createChatHandler(
         @RequestBody SingleChatRequest request,
@@ -50,6 +54,7 @@ public class ChatController {
         return new ResponseEntity<>(chat, HttpStatus.CREATED);
     }
 
+    @Operation(summary = "Create a new group chat", description = "Creates a new group chat with the requesting user as admin")
     @PostMapping("/create/group")
     public ResponseEntity<Chat> createGroupHandler(
         @RequestBody GroupChatRequest request,
@@ -62,13 +67,14 @@ public class ChatController {
         return new ResponseEntity<>(chat, HttpStatus.CREATED);
     }
 
+    @Operation(summary = "Find chat by ID", description = "Retrieves a chat by its unique ID")
     @GetMapping("/{chatId}")
     public ResponseEntity<Chat> findChatByIdHandler(@PathVariable UUID chatId, @RequestHeader("Authorization") String token) throws ChatException{
         Chat chat = chatService.findChatById(chatId);
         return new ResponseEntity<>(chat, HttpStatus.ACCEPTED);
     }
 
-    
+    @Operation(summary = "Find all chats for a user", description = "Retrieves all chats associated with the requesting user")
     @GetMapping("/user/chats")
     public ResponseEntity<List<Chat>> findAllChatsByUserHandler(@RequestHeader("Authorization") String token) throws ChatException, UserException{
         User user = userService.findUserProfile(token);
@@ -76,6 +82,7 @@ public class ChatController {
         return new ResponseEntity<>(chats, HttpStatus.ACCEPTED);
     }
 
+    @Operation(summary = "Add user to group chat", description = "Adds a user to an existing group chat")
     @PutMapping("/{chatId}/add/{userId}")
     public ResponseEntity<Chat> addUserToGroup(
         @PathVariable UUID chatId,
@@ -87,6 +94,7 @@ public class ChatController {
         return new ResponseEntity<>(chat, HttpStatus.ACCEPTED);
     }
 
+    @Operation(summary = "Remove user from group chat", description = "Removes a user from an existing group chat")
     @PutMapping("/{chatId}/remove/{userId}")
     public ResponseEntity<Chat> removeUserToGroup(
         @PathVariable UUID chatId,
@@ -98,6 +106,7 @@ public class ChatController {
         return new ResponseEntity<>(chat, HttpStatus.OK);
     }
 
+    @Operation(summary = "Rename group chat", description = "Renames an existing group chat")
     @PatchMapping("/update/{chatId}")
     public ResponseEntity<Chat> renameGroupHandler(
         @PathVariable UUID chatId,
@@ -109,6 +118,7 @@ public class ChatController {
         return new ResponseEntity<>(chat, HttpStatus.OK);
     }
 
+    @Operation(summary = "Delete a chat", description = "Deletes an existing chat by its ID")
     @DeleteMapping("/delete/{chatId}")
     public ResponseEntity<ApiResponse> deleteChat(@PathVariable UUID chatId, @RequestHeader("Authorization") String token) throws ChatException, UserException{
         User user = userService.findUserProfile(token);

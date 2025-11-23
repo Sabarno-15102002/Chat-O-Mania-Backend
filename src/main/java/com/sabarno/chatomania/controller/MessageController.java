@@ -28,8 +28,12 @@ import com.sabarno.chatomania.response.ApiResponse;
 import com.sabarno.chatomania.service.MessageService;
 import com.sabarno.chatomania.service.UserService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @RestController
 @RequestMapping("/api/messages")
+@Tag(name = "Message Controller", description = "APIs for managing messages within chats")
 public class MessageController {
 
     @Autowired
@@ -38,6 +42,7 @@ public class MessageController {
     @Autowired
     private UserService userService;
 
+    @Operation(summary = "Send a new message", description = "Sends a new message within a chat")
     @PostMapping("/create")
     public ResponseEntity<Message> sendMessage(@RequestBody SendMessageRequest request,
             @RequestHeader("Authorization") String token) throws UserException, ChatException {
@@ -47,6 +52,7 @@ public class MessageController {
         return new ResponseEntity<>(message, HttpStatus.ACCEPTED);
     }
 
+    @Operation(summary = "Get messages of a chat", description = "Retrieves all messages within a specific chat")
     @GetMapping("/chat/{chatId}")
     public ResponseEntity<List<Message>> getChatsMessagesHandler(
             @PathVariable UUID chatId,
@@ -56,6 +62,7 @@ public class MessageController {
         return new ResponseEntity<>(messages, HttpStatus.OK);
     }
 
+    @Operation(summary = "Mark messages as seen", description = "Marks all messages in a chat as seen by the user")
     @PutMapping("/{chatId}/seen")
     public ResponseEntity<ApiResponse> markSeen(
         @PathVariable UUID chatId,
@@ -69,6 +76,7 @@ public class MessageController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
+    @Operation(summary = "Edit a message", description = "Edits the content of an existing message")
     @PatchMapping("/{messageId}")
     public ResponseEntity<Message> editMessage(
             @RequestBody EditMessageRequest request,
@@ -79,6 +87,7 @@ public class MessageController {
         return new ResponseEntity<>(message, HttpStatus.OK);
     }
 
+    @Operation(summary = "Delete a message", description = "Deletes an existing message")
     @DeleteMapping("/{messageId}")
     public ResponseEntity<ApiResponse> deleteMessage(
             @PathVariable UUID messageId,

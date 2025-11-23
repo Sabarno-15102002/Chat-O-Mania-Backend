@@ -21,21 +21,32 @@ import jakarta.servlet.http.HttpServletRequest;
 @EnableWebSecurity
 public class AppConfig {
 
+    private static final String[] SWAGGER_WHITELIST = {
+            "/swagger-ui/**",
+            "/swagger-resources/**",
+            "/v3/api-docs/**",
+            "/webjars/**"
+    };
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http.sessionManagement(management -> management.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(Authorize -> Authorize
-                .requestMatchers(
-                    "/api/auth/register",
-                    "/api/auth/login",
-                    "/ws/**").permitAll()
-                .requestMatchers("/api/**").authenticated().anyRequest().permitAll())
+                        .requestMatchers(
+                                "/api/auth/register",
+                                "/api/auth/login",
+                                "/ws/**"
+                                )
+                        .permitAll()
+                        .requestMatchers(SWAGGER_WHITELIST)
+                        .permitAll()
+                        .requestMatchers("/api/**").authenticated().anyRequest().permitAll())
                 .addFilterBefore(new JwtTokenValidator(), BasicAuthenticationFilter.class)
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .build();
     }
-    
+
     private CorsConfigurationSource corsConfigurationSource() {
         return new CorsConfigurationSource() {
             @Override

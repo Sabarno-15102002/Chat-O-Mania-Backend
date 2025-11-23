@@ -21,8 +21,12 @@ import com.sabarno.chatomania.response.AuthResponse;
 import com.sabarno.chatomania.service.CustomUserService;
 import com.sabarno.chatomania.service.UserService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "Authentication Controller", description = "APIs for user registration and login")
 public class AuthController {
 
     @Autowired
@@ -37,6 +41,7 @@ public class AuthController {
     private CustomUserService customUserDetailsService;
 
 
+    @Operation(summary = "Register a new user", description = "Creates a new user account and returns a JWT token upon successful registration")
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> createUserHandler(@RequestBody User user) throws UserException{
         String email = user.getEmail();
@@ -64,6 +69,7 @@ public class AuthController {
         return new ResponseEntity<>(res, HttpStatus.CREATED);
     }
 
+    @Operation(summary = "Login a user", description = "Authenticates a user and returns a JWT token upon successful login")
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> loginUserHandler(@RequestBody User user) throws UserException{
         String email = user.getEmail();
