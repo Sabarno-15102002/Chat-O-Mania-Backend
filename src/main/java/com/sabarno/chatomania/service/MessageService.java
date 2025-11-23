@@ -15,5 +15,7 @@ public interface MessageService {
     public Message sendMessage(SendMessageRequest request) throws ChatException, UserException;
     public List<Message> getChatsMessages(UUID chatId, User reqUser) throws ChatException;
     public Message findMessageById(UUID messageId) throws MessageException;
+    public Message editMessage(UUID messageId, String newContent, User reqUser) throws MessageException;
     public void deleteMessage(UUID messageId, User reqUser) throws MessageException;
+    public void setMessageToSeen(UUID chatId, User reqUser) throws ChatException;
 }

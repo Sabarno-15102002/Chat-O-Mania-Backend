@@ -39,6 +39,7 @@ public class ChatServiceImpl implements ChatService{
         newChat.getParticipants().add(reqUser);
         newChat.getParticipants().add(otherUser);
         newChat.setGroup(false);
+        newChat.setChatName(otherUser.getName());
         newChat.setCreatedAt(LocalDateTime.now());
         chatRepository.save(newChat);
         return newChat;

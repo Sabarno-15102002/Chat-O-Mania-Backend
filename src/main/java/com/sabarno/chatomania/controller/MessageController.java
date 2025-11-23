@@ -8,8 +8,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,6 +22,7 @@ import com.sabarno.chatomania.entity.User;
 import com.sabarno.chatomania.exception.ChatException;
 import com.sabarno.chatomania.exception.MessageException;
 import com.sabarno.chatomania.exception.UserException;
+import com.sabarno.chatomania.request.EditMessageRequest;
 import com.sabarno.chatomania.request.SendMessageRequest;
 import com.sabarno.chatomania.response.ApiResponse;
 import com.sabarno.chatomania.service.MessageService;
@@ -36,7 +39,8 @@ public class MessageController {
     private UserService userService;
 
     @PostMapping("/create")
-    public ResponseEntity<Message> sendMessage(@RequestBody SendMessageRequest request, @RequestHeader("Authorization") String token) throws UserException, ChatException{
+    public ResponseEntity<Message> sendMessage(@RequestBody SendMessageRequest request,
+            @RequestHeader("Authorization") String token) throws UserException, ChatException {
         User user = userService.findUserProfile(token);
         request.setUserId(user.getId());
         Message message = messageService.sendMessage(request);
@@ -45,19 +49,40 @@ public class MessageController {
 
     @GetMapping("/chat/{chatId}")
     public ResponseEntity<List<Message>> getChatsMessagesHandler(
-        @PathVariable UUID chatId,
-        @RequestHeader("Authorization") String token
-    ) throws UserException, ChatException{
+            @PathVariable UUID chatId,
+            @RequestHeader("Authorization") String token) throws UserException, ChatException {
         User user = userService.findUserProfile(token);
         List<Message> messages = messageService.getChatsMessages(chatId, user);
         return new ResponseEntity<>(messages, HttpStatus.OK);
     }
 
+    @PutMapping("/{chatId}/seen")
+    public ResponseEntity<ApiResponse> markSeen(
+        @PathVariable UUID chatId,
+        @RequestHeader("Authorization") String token
+    ) throws ChatException, UserException{
+        User user = userService.findUserProfile(token);
+        messageService.setMessageToSeen(chatId, user);
+
+        ApiResponse response = new ApiResponse();
+        response.setMessage("All messages are Seen");
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PatchMapping("/{messageId}")
+    public ResponseEntity<Message> editMessage(
+            @RequestBody EditMessageRequest request,
+            @PathVariable UUID messageId,
+            @RequestHeader("Authorization") String token) throws UserException, MessageException {
+        User user = userService.findUserProfile(token);
+        Message message = messageService.editMessage(messageId, request.getNewContent(), user);
+        return new ResponseEntity<>(message, HttpStatus.OK);
+    }
+
     @DeleteMapping("/{messageId}")
     public ResponseEntity<ApiResponse> deleteMessage(
-        @PathVariable UUID messageId,
-        @RequestHeader("Authorization") String token
-    ) throws UserException, MessageException{
+            @PathVariable UUID messageId,
+            @RequestHeader("Authorization") String token) throws UserException, MessageException {
         User user = userService.findUserProfile(token);
         messageService.deleteMessage(messageId, user);
 

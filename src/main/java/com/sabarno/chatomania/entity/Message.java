@@ -1,9 +1,19 @@
 package com.sabarno.chatomania.entity;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
+import com.sabarno.chatomania.utility.MessageState;
+import com.sabarno.chatomania.utility.MessageType;
+import com.sabarno.chatomania.utility.SeenInfo;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -19,7 +29,9 @@ public class Message {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
+    @Column(columnDefinition = "TEXT")
     private String content;
+
     private LocalDateTime timestamp;
 
     @ManyToOne
@@ -28,4 +40,14 @@ public class Message {
     @ManyToOne
     @JoinColumn(name = "chat_id")
     private Chat chat;
+
+    @Enumerated(EnumType.STRING)
+    private MessageState state;
+
+    @Enumerated(EnumType.STRING)
+    private MessageType type;
+
+    @ElementCollection
+    private Set<SeenInfo> seenBy = new HashSet<>();
+
 }
