@@ -8,27 +8,30 @@ import org.springframework.stereotype.Service;
 
 import com.sabarno.chatomania.service.NotificationService;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
-public class NotificationServiceImpl implements NotificationService{
+@Slf4j
+public class NotificationServiceImpl implements NotificationService {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
     @Override
     public void sendNotificationToUser(UUID senderId, UUID chatId, Object payload) {
+        log.info("Sending notification {} to user: {} in chat{}", payload, senderId, chatId);
         messagingTemplate.convertAndSendToUser(
                 senderId.toString(),
-                "/user/"+chatId.toString(),
-                payload
-        );
+                "/user/" + chatId.toString(),
+                payload);
     }
 
     @Override
     public void sendNotificationToGroup(UUID chatId, Object payload) {
+        log.info("Sending notification {} to group: {}", payload, chatId);
         messagingTemplate.convertAndSend(
-            "/group/"+chatId.toString(),
-            payload
-        );
+                "/group/" + chatId.toString(),
+                payload);
     }
 
 }

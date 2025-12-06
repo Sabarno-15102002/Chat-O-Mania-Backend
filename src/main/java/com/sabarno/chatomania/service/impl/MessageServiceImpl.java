@@ -28,7 +28,10 @@ import com.sabarno.chatomania.utility.NotificationType;
 import com.sabarno.chatomania.utility.SeenInfo;
 import com.sabarno.chatomania.utility.SeenUpdatePayload;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@Slf4j
 public class MessageServiceImpl implements MessageService{
 
     @Autowired
@@ -56,6 +59,7 @@ public class MessageServiceImpl implements MessageService{
         message.setContent(request.getContent());
         message.setState(MessageState.SENT);
         message.setType(MessageType.TEXT);
+        log.info("User {} is sending message to chat {}", user.getName(), chat.getChatName());
         messageRepository.save(message);
 
         Notification notification = new Notification();

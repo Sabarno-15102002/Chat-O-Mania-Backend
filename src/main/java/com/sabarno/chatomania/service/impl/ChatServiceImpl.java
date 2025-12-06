@@ -16,7 +16,10 @@ import com.sabarno.chatomania.request.GroupChatRequest;
 import com.sabarno.chatomania.service.ChatService;
 import com.sabarno.chatomania.service.UserService;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@Slf4j
 public class ChatServiceImpl implements ChatService{
 
     @Autowired
@@ -33,6 +36,7 @@ public class ChatServiceImpl implements ChatService{
         if(existingChat != null) {
             return existingChat;
         }
+        log.info("Creating new chat between {} and {}", reqUser.getName(), otherUser.getName());
 
         Chat newChat = new Chat();
         newChat.setCreatedBy(reqUser);
@@ -41,6 +45,7 @@ public class ChatServiceImpl implements ChatService{
         newChat.setGroup(false);
         newChat.setChatName(otherUser.getName());
         newChat.setCreatedAt(LocalDateTime.now());
+        log.info("Created chat: {}", newChat);
         chatRepository.save(newChat);
         return newChat;
     }
@@ -73,6 +78,8 @@ public class ChatServiceImpl implements ChatService{
             newGroupChat.getParticipants().add(user);
         }
 
+        log.info("New group created by {} with name {}", reqUser.getName(), req.getGroupName());
+        log.info("Created chat: {}", newGroupChat);
         chatRepository.save(newGroupChat);
         return newGroupChat;
     }
