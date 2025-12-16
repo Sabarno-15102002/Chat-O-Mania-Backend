@@ -14,7 +14,7 @@ import com.sabarno.chatomania.utility.MessageState;
 public interface MessageRepository extends JpaRepository<Message, UUID> {
 
     @Query("SELECT m FROM Message m WHERE m.chat.id = :chatId ORDER BY m.timestamp ASC")
-    public List<Message> findByChatId(@Param("chatId") UUID chatId);
+    List<Message> findByChatId(@Param("chatId") UUID chatId);
 
     @Query("UPDATE Message SET state = :newState WHERE chat.id = :chatId")
     @Modifying

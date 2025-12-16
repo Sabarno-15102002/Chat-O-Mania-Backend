@@ -13,8 +13,8 @@ import com.sabarno.chatomania.entity.User;
 public interface ChatRepository extends JpaRepository<Chat, UUID>{
 
     @Query("SELECT c FROM Chat c JOIN c.participants u WHERE u.id = :userId")
-    public List<Chat> findChatsByUserId(@Param("userId") UUID userId);
+    List<Chat> findChatsByUserId(@Param("userId") UUID userId);
 
     @Query("SELECT c FROM Chat c JOIN c.participants u1 JOIN c.participants u2 WHERE u1 = :user AND u2 = :reqUser AND c.isGroup = false")
-    public Chat findSingleChatByUserIds(@Param("user") User user, @Param("reqUser") User reqUser);
+    Chat findSingleChatByUserIds(@Param("user") User user, @Param("reqUser") User reqUser);
 }

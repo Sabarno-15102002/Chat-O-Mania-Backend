@@ -10,8 +10,8 @@ import com.sabarno.chatomania.entity.User;
 
 
 public interface UserRepository extends JpaRepository<User, UUID>{
-    public User findByEmail(String email);
+    User findByEmail(String email);
 
     @Query("SELECT u FROM User u WHERE LOWER(u.name) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :query, '%'))")
-    public List<User> searchUser(String query);
+    List<User> searchUser(String query);
 }
