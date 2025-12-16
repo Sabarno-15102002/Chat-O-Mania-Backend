@@ -3,6 +3,7 @@ package com.sabarno.chatomania.config;
 import java.util.Arrays;
 import java.util.Collections;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -28,6 +29,9 @@ public class AppConfig {
             "/webjars/**"
     };
 
+    @Autowired
+    private RateLimitFilter rateLimitFilter;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http.sessionManagement(management -> management.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -41,7 +45,8 @@ public class AppConfig {
                         .requestMatchers(SWAGGER_WHITELIST)
                         .permitAll()
                         .requestMatchers("/api/**").authenticated().anyRequest().permitAll())
-                .addFilterBefore(new JwtTokenValidator(), BasicAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, BasicAuthenticationFilter.class)
+                .addFilterAfter(new JwtTokenValidator(), RateLimitFilter.class)
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .build();
