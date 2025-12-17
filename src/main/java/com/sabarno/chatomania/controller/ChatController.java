@@ -107,7 +107,7 @@ public class ChatController {
     }
 
     @Operation(summary = "Rename group chat", description = "Renames an existing group chat")
-    @PatchMapping("/update/{chatId}")
+    @PatchMapping("/update/{chatId}/name")
     public ResponseEntity<Chat> renameGroupHandler(
         @PathVariable UUID chatId,
         @RequestBody String newName,
@@ -115,6 +115,18 @@ public class ChatController {
     ) throws ChatException, UserException{
         User user = userService.findUserProfile(token);
         Chat chat = chatService.renameGroupChat(newName, chatId, user);
+        return new ResponseEntity<>(chat, HttpStatus.OK);
+    }
+
+    @Operation(summary = "Update group chat description", description = "Updates the description of an existing group chat")
+    @PatchMapping("/update/{chatId}/description")
+    public ResponseEntity<Chat> updateGroupDescriptionHandler(
+        @PathVariable UUID chatId,
+        @RequestBody String newDescription,
+        @RequestHeader("Authorization") String token
+    ) throws ChatException, UserException{
+        User user = userService.findUserProfile(token);
+        Chat chat = chatService.updateGroupDescription(newDescription, chatId, user);
         return new ResponseEntity<>(chat, HttpStatus.OK);
     }
 

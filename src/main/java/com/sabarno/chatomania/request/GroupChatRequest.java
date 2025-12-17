@@ -10,4 +10,5 @@ public class GroupChatRequest {
     private String groupName;
     private List<UUID> userIds;
     private String groupIcon;
+    private String description;
 }

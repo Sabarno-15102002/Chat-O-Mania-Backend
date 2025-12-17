@@ -27,8 +27,11 @@ public class Chat {
     private UUID id;
 
     private String chatName;
+
     private String chatImage;
 
+    private String description;
+    
     @Column(name = "is_group")
     private boolean isGroup;
 

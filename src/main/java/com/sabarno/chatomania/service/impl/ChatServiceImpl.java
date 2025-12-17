@@ -68,6 +68,7 @@ public class ChatServiceImpl implements ChatService{
         Chat newGroupChat = new Chat();
         newGroupChat.setChatName(req.getGroupName());
         newGroupChat.setGroup(true);
+        newGroupChat.setDescription(req.getDescription());
         newGroupChat.setCreatedBy(reqUser);
         newGroupChat.getAdmins().add(reqUser);
         newGroupChat.setCreatedAt(LocalDateTime.now());
@@ -113,6 +114,22 @@ public class ChatServiceImpl implements ChatService{
         }
 
         groupChat.setChatName(newName);
+        chatRepository.save(groupChat);
+        return groupChat;
+    }
+
+    @Override
+    public Chat updateGroupDescription(String newDescription, UUID chatId, User reqUser) throws ChatException, UserException {
+        Chat groupChat = findChatById(chatId);
+        if(!groupChat.isGroup()) {
+            throw new ChatException("Cannot rename a single chat");
+        }
+
+        if(!groupChat.getAdmins().contains(reqUser)) {
+            throw new UserException("Only admins can rename the group");
+        }
+
+        groupChat.setDescription(newDescription);
         chatRepository.save(groupChat);
         return groupChat;
     }
