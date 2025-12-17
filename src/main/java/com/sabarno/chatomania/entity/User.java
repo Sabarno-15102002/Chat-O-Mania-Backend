@@ -2,7 +2,11 @@ package com.sabarno.chatomania.entity;
 
 import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.sabarno.chatomania.utility.AuthProvider;
+
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -23,4 +27,7 @@ public class User {
     
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    private AuthProvider authProvider;
 }

@@ -15,4 +15,5 @@ public interface UserService {
     public User updateUser(UUID id, UpdateUserRequest request) throws UserException;
     public List<User> searchUser(String query);
     public User createUser(User user);
+    public User createOAuthUser(String email, String name, String profilePicture);
 }

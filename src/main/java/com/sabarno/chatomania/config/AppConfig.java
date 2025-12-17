@@ -16,10 +16,14 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 
+import com.sabarno.chatomania.service.OAuth2SuccessHandler;
+
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 
 @Configuration
 @EnableWebSecurity
+@Slf4j
 public class AppConfig {
 
     private static final String[] SWAGGER_WHITELIST = {
@@ -32,6 +36,9 @@ public class AppConfig {
     @Autowired
     private RateLimitFilter rateLimitFilter;
 
+    @Autowired
+    private OAuth2SuccessHandler oAuth2SuccessHandler;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http.sessionManagement(management -> management.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -39,14 +46,21 @@ public class AppConfig {
                         .requestMatchers(
                                 "/api/auth/register",
                                 "/api/auth/login",
-                                "/ws/**"
-                                )
+                                "/oauth2/**",
+                                "/login/oauth2/**",
+                                "/ws/**")
                         .permitAll()
                         .requestMatchers(SWAGGER_WHITELIST)
                         .permitAll()
                         .requestMatchers("/api/**").authenticated().anyRequest().permitAll())
                 .addFilterBefore(rateLimitFilter, BasicAuthenticationFilter.class)
                 .addFilterAfter(new JwtTokenValidator(), RateLimitFilter.class)
+                .oauth2Login(oauth -> oauth
+                        .successHandler(oAuth2SuccessHandler)
+                        .failureHandler((request, response, exception) -> {
+                            log.error("OAuth2 error: {}", exception.getMessage());
+                            throw new RuntimeException("OAuth2 Authentication Failed", exception);
+                        }))
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .build();

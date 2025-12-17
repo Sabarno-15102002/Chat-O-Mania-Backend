@@ -20,6 +20,7 @@ import com.sabarno.chatomania.exception.UserException;
 import com.sabarno.chatomania.response.AuthResponse;
 import com.sabarno.chatomania.service.CustomUserService;
 import com.sabarno.chatomania.service.UserService;
+import com.sabarno.chatomania.utility.AuthProvider;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -57,6 +58,7 @@ public class AuthController {
         newUser.setEmail(email);
         newUser.setName(name);
         newUser.setPassword(passwordEncoder.encode(password));
+        newUser.setAuthProvider(AuthProvider.EMAIL);
         userService.createUser(newUser);
         Authentication authentication = new UsernamePasswordAuthenticationToken(email, password);
         SecurityContextHolder.getContext().setAuthentication(authentication);

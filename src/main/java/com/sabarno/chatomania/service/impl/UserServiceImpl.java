@@ -13,6 +13,9 @@ import com.sabarno.chatomania.exception.UserException;
 import com.sabarno.chatomania.repository.UserRepository;
 import com.sabarno.chatomania.request.UpdateUserRequest;
 import com.sabarno.chatomania.service.UserService;
+import com.sabarno.chatomania.utility.AuthProvider;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class UserServiceImpl implements UserService{
@@ -63,6 +66,17 @@ public class UserServiceImpl implements UserService{
 
     @Override
     public User createUser(User user) {
+        return userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public User createOAuthUser(String email, String name, String profilePicture) {
+        User user = new User();
+        user.setEmail(email);
+        user.setName(name);
+        user.setProfilePicture(profilePicture);
+        user.setAuthProvider(AuthProvider.GOOGLE);
         return userRepository.save(user);
     }
 

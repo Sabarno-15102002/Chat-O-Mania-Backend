@@ -33,5 +33,12 @@ public class JwtProvider {
         return email;
     }
 
-    
+    public String generateTokenForOAuth(String email){
+        String jwt = Jwts.builder().setIssuer("Chat_O_Mania")
+                    .setIssuedAt(new Date()).setExpiration(new Date(new Date().getTime() + 86400000))
+                    .claim("email", email)
+                    .signWith(key)
+                    .compact();
+        return jwt;
+    }
 }
