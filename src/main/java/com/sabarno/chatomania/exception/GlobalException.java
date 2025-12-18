@@ -63,6 +63,16 @@ public class GlobalException {
         return new ResponseEntity<>(err, HttpStatus.NOT_FOUND);
     }
 
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ErrorDetail> BadRequestExceptionHandler(BadRequestException e, WebRequest req){
+        ErrorDetail err = new ErrorDetail();
+        err.setError(e.getMessage());
+        err.setMessage(req.getDescription(false));
+        err.setTimestamp(LocalDateTime.now());
+
+        return new ResponseEntity<>(err, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorDetail> GlobalExceptionHandler(UserException e, WebRequest req){
         ErrorDetail err = new ErrorDetail();

@@ -19,6 +19,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import lombok.Data;
 
 @Entity
@@ -40,6 +41,10 @@ public class Message {
     @ManyToOne
     @JoinColumn(name = "chat_id")
     private Chat chat;
+
+    @OneToOne
+    @JoinColumn(name = "media_id")
+    private Media media;
 
     @Enumerated(EnumType.STRING)
     private MessageState state;

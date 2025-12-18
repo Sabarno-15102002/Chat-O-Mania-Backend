@@ -2,6 +2,7 @@ package com.sabarno.chatomania.entity;
 
 import java.util.UUID;
 
+import com.sabarno.chatomania.response.CloudinaryUploadResponse;
 import com.sabarno.chatomania.utility.MessageType;
 import com.sabarno.chatomania.utility.NotificationType;
 
@@ -16,5 +17,5 @@ public class Notification {
     private String chatName;
     private MessageType messageType;
     private NotificationType type;
-    // private byte[] media;
+    private CloudinaryUploadResponse response;
 }

@@ -2,25 +2,34 @@ package com.sabarno.chatomania.service.impl;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.Transformation;
 import com.sabarno.chatomania.entity.Chat;
+import com.sabarno.chatomania.entity.Media;
 import com.sabarno.chatomania.entity.Message;
 import com.sabarno.chatomania.entity.Notification;
 import com.sabarno.chatomania.entity.User;
+import com.sabarno.chatomania.exception.BadRequestException;
 import com.sabarno.chatomania.exception.ChatException;
 import com.sabarno.chatomania.exception.MessageException;
 import com.sabarno.chatomania.exception.UserException;
+import com.sabarno.chatomania.repository.MediaRepository;
 import com.sabarno.chatomania.repository.MessageRepository;
 import com.sabarno.chatomania.request.SendMessageRequest;
+import com.sabarno.chatomania.response.CloudinaryUploadResponse;
 import com.sabarno.chatomania.service.ChatService;
 import com.sabarno.chatomania.service.MessageService;
 import com.sabarno.chatomania.service.NotificationService;
 import com.sabarno.chatomania.service.UserService;
+import com.sabarno.chatomania.utility.MediaTypeResolver;
 import com.sabarno.chatomania.utility.MessageEvent;
 import com.sabarno.chatomania.utility.MessageState;
 import com.sabarno.chatomania.utility.MessageType;
@@ -32,7 +41,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j
-public class MessageServiceImpl implements MessageService{
+public class MessageServiceImpl implements MessageService {
 
     @Autowired
     private MessageRepository messageRepository;
@@ -46,19 +55,52 @@ public class MessageServiceImpl implements MessageService{
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private Cloudinary cloudinary;
+
+    @Autowired
+    private MediaRepository mediaRepository;
+
+    private final String folder = "Chat_O_Mania";
+    public static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024;   // 10 MB
+    public static final long MAX_AUDIO_SIZE = 20 * 1024 * 1024;   // 20 MB
+    public static final long MAX_DOCUMENT_SIZE = 30 * 1024 * 1024;   // 30 MB
+    public static final long MAX_VIDEO_SIZE = 200 * 1024 * 1024;  // 200 MB
     @Override
+    @Transactional
     public Message sendMessage(SendMessageRequest request) throws ChatException, UserException {
-        
+
         User user = userService.findUserById(request.getUserId());
         Chat chat = chatService.findChatById(request.getChatId());
-        
+
         Message message = new Message();
         message.setChat(chat);
         message.setSender(user);
         message.setTimestamp(LocalDateTime.now());
         message.setContent(request.getContent());
         message.setState(MessageState.SENT);
-        message.setType(MessageType.TEXT);
+        CloudinaryUploadResponse uploadResponse = null;
+        if (request.getFile() == null) {
+            message.setType(MessageType.TEXT);
+            log.info("No media file attached with the message from user {}", user.getName());
+        } else {
+            uploadResponse = upload(request.getFile());
+            message.setType(uploadResponse.getMessageType());
+            Media media = new Media();
+            media.setUrl(uploadResponse.getUrl());
+            media.setPublicId(uploadResponse.getPublicId());
+            media.setType(uploadResponse.getMessageType());
+            media.setSize(uploadResponse.getSize());
+            if (uploadResponse.getMessageType() == MessageType.VIDEO) {
+                media.setDuration(uploadResponse.getDuration());
+                media.setThumbnailUrl(uploadResponse.getThumbnail());
+            } else if (uploadResponse.getMessageType() == MessageType.AUDIO) {
+                media.setDuration(uploadResponse.getDuration());
+            }
+            media = mediaRepository.save(media);
+            message.setMedia(media);
+            log.info("Media file uploaded to Cloudinary with URL: {}", uploadResponse.getUrl());
+        }
         log.info("User {} is sending message to chat {}", user.getName(), chat.getChatName());
         messageRepository.save(message);
 
@@ -66,12 +108,13 @@ public class MessageServiceImpl implements MessageService{
         notification.setChatId(chat.getId());
         notification.setContent(message.getContent());
         notification.setType(NotificationType.MESSAGE);
-        notification.setMessageType(MessageType.TEXT);
+        notification.setMessageType(message.getType());
         notification.setSenderId(message.getSender().getId());
         notification.setChatName(chat.getChatName());
-        if(chat.isGroup() == false){
+        notification.setResponse(uploadResponse);
+        if (chat.isGroup() == false) {
             chat.getParticipants().forEach(participant -> {
-                if(!participant.getId().equals(user.getId())){
+                if (!participant.getId().equals(user.getId())) {
                     notification.setReceiverId(participant.getId());
                 }
             });
@@ -87,7 +130,7 @@ public class MessageServiceImpl implements MessageService{
     public List<Message> getChatsMessages(UUID chatId, User reqUser) throws ChatException {
 
         Chat chat = chatService.findChatById(chatId);
-        if(!chat.getParticipants().contains(reqUser)){
+        if (!chat.getParticipants().contains(reqUser)) {
             throw new ChatException("Chat is not accesible to User");
         }
         List<Message> messages = messageRepository.findByChatId(chatId);
@@ -96,16 +139,23 @@ public class MessageServiceImpl implements MessageService{
 
     @Override
     public Message findMessageById(UUID messageId) throws MessageException {
-        Message message = messageRepository.findById(messageId).orElseThrow(() -> new MessageException("Message Not Found with id:" + messageId));
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new MessageException("Message Not Found with id:" + messageId));
 
         return message;
     }
 
     @Override
+    @Transactional
     public void deleteMessage(UUID messageId, User reqUser) throws MessageException {
-        Message message = messageRepository.findById(messageId).orElseThrow(() -> new MessageException("Message Not Found with id:" + messageId));
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new MessageException("Message Not Found with id:" + messageId));
 
-        if(message.getSender().getId().equals(reqUser.getId())){
+        if (message.getSender().getId().equals(reqUser.getId())) {
+            if (message.getMedia() != null) {
+                mediaRepository.deleteById(message.getMedia().getId());
+                deleteMediaFromCloudinary(message.getMedia().getPublicId());
+            }
             messageRepository.deleteById(messageId);
 
             MessageEvent event = new MessageEvent();
@@ -114,10 +164,9 @@ public class MessageServiceImpl implements MessageService{
             event.setSenderId(reqUser.getId());
             event.setTimestamp(LocalDateTime.now());
 
-            if(message.getChat().isGroup()){
+            if (message.getChat().isGroup()) {
                 notificationService.sendNotificationToGroup(messageId, event);
-            }
-            else{
+            } else {
                 notificationService.sendNotificationToUser(reqUser.getId(), messageId, event);
             }
         }
@@ -128,24 +177,49 @@ public class MessageServiceImpl implements MessageService{
     @Transactional
     public void setMessageToSeen(UUID chatId, User reqUser) throws ChatException {
         Chat chat = chatService.findChatById(chatId);
-        if(chat.isGroup()){
+        if (chat.isGroup()) {
             setMessageToSeenForGroup(chatId, reqUser.getId());
-        }
-        else{
+        } else {
             UUID recipientId = chat.getParticipants().stream()
-                .filter(participant -> !participant.getId().equals(reqUser.getId()))
-                .findFirst()
-                .get()
-                .getId();
+                    .filter(participant -> !participant.getId().equals(reqUser.getId()))
+                    .findFirst()
+                    .get()
+                    .getId();
             setMessaageToSeenForChat(chat, recipientId, reqUser);
         }
     }
 
-    private void setMessageToSeenForGroup(UUID chatId, UUID userId) {
-        List<Message> unreadMessages =
-                messageRepository.findUnreadMessagesForUser(chatId, userId);
+    @Override
+    public Message editMessage(UUID messageId, String newContent, User reqUser) throws MessageException {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new MessageException("Message Not Found with id:" + messageId));
 
-        if (unreadMessages.isEmpty()) return;
+        if (message.getSender().getId().equals(reqUser.getId())) {
+            message.setContent(newContent);
+            message = messageRepository.save(message);
+
+            MessageEvent event = new MessageEvent();
+            event.setChatId(message.getChat().getId());
+            event.setMessageId(messageId);
+            event.setSenderId(reqUser.getId());
+            event.setNewContent(newContent);
+            event.setTimestamp(LocalDateTime.now());
+
+            if (message.getChat().isGroup()) {
+                notificationService.sendNotificationToGroup(messageId, event);
+            } else {
+                notificationService.sendNotificationToUser(reqUser.getId(), messageId, event);
+            }
+            return message;
+        }
+        throw new MessageException("User cannot edit this message");
+    }
+
+    private void setMessageToSeenForGroup(UUID chatId, UUID userId) {
+        List<Message> unreadMessages = messageRepository.findUnreadMessagesForUser(chatId, userId);
+
+        if (unreadMessages.isEmpty())
+            return;
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -169,7 +243,7 @@ public class MessageServiceImpl implements MessageService{
     }
 
     private void setMessaageToSeenForChat(Chat chat, UUID recipientId, User reqUser) {
-        
+
         messageRepository.setMessagesToSeenByChatId(chat.getId(), MessageState.SEEN);
         Notification notification = new Notification();
         notification.setChatId(chat.getId());
@@ -181,29 +255,110 @@ public class MessageServiceImpl implements MessageService{
         notificationService.sendNotificationToUser(reqUser.getId(), chat.getId(), notification);
     }
 
-    @Override
-    public Message editMessage(UUID messageId, String newContent, User reqUser) throws MessageException {
-        Message message = messageRepository.findById(messageId).orElseThrow(() -> new MessageException("Message Not Found with id:" + messageId));
+    private CloudinaryUploadResponse upload(MultipartFile file) {
+        try {
+            validateFileSize(file);
+            Map<String, Object> options = Map.of(
+                "folder", folder,
+                "resource_type", "auto"
+            );
 
-        if(message.getSender().getId().equals(reqUser.getId())){
-            message.setContent(newContent);
-            message = messageRepository.save(message);
-            
-            MessageEvent event = new MessageEvent();
-            event.setChatId(message.getChat().getId());
-            event.setMessageId(messageId);
-            event.setSenderId(reqUser.getId());
-            event.setNewContent(newContent);
-            event.setTimestamp(LocalDateTime.now());
+            Map<?, ?> result = cloudinary.uploader()
+                    .upload(file.getBytes(), options);
 
-            if(message.getChat().isGroup()){
-                notificationService.sendNotificationToGroup(messageId, event);
+            MessageType type = detectMessageType(result);
+
+            Long duration = null;
+            if (result.get("duration") instanceof Number d) {
+                duration = d.longValue();
             }
-            else{
-                notificationService.sendNotificationToUser(reqUser.getId(), messageId, event);
+
+
+            String thumbnailUrl = null;
+            if ("video".equals(result.get("resource_type"))) {
+                thumbnailUrl = cloudinary.url()
+                    .resourceType("video")
+                    .transformation(new Transformation()
+                        .startOffset(1)
+                        .crop("fill"))
+                    .format("jpg")
+                    .generate(result.get("public_id").toString());
             }
-            return message;
+
+            return new CloudinaryUploadResponse(
+                result.get("secure_url").toString(),
+                result.get("public_id").toString(),
+                result.get("resource_type").toString(),
+                ((Number) result.get("bytes")).longValue(),
+                type,
+                thumbnailUrl,
+                duration
+            );
+
+        } catch (Exception e) {
+            throw new RuntimeException("Cloudinary upload failed", e);
         }
-        throw new MessageException("User cannot edit this message");
+    }
+
+    private MessageType detectMessageType(Map<?, ?> result) {
+        String resourceType = result.get("resource_type").toString();
+        String format = result.get("format").toString();
+
+        if ("image".equals(resourceType)) {
+            return MessageType.IMAGE;
+        }
+
+        if ("video".equals(resourceType)) {
+            if (List.of("mp3", "wav", "ogg", "aac").contains(format)) {
+                return MessageType.AUDIO;
+            }
+            return MessageType.VIDEO;
+        }
+
+        return MessageType.DOCUMENT;
+    }
+
+    private void validateFileSize(MultipartFile file) throws BadRequestException {
+
+        if (file == null || file.isEmpty()) {
+            return; // text message
+        }
+
+        MessageType type = MediaTypeResolver.resolve(file);
+        long size = file.getSize();
+
+        switch (type) {
+            case IMAGE -> {
+                if (size > MAX_IMAGE_SIZE)
+                    throw new BadRequestException("Image exceeds 10MB");
+            }
+            case VIDEO -> {
+                if (size > MAX_VIDEO_SIZE)
+                    throw new BadRequestException("Video exceeds 100MB");
+            }
+            case AUDIO -> {
+                if (size > MAX_AUDIO_SIZE)
+                    throw new BadRequestException("Audio exceeds 20MB");
+            }
+            case DOCUMENT -> {
+                if (size > MAX_DOCUMENT_SIZE)
+                    throw new BadRequestException("Document exceeds 30MB");
+            }
+            default -> throw new IllegalArgumentException("Unexpected value: " + type);
+        }
+        
+    }
+
+
+    private void deleteMediaFromCloudinary(String publicId) {
+        try {
+            Map<String, Object> options = Map.of(
+                "resource_type", "auto"
+            );
+            cloudinary.uploader().destroy(publicId, options);
+            log.info("Media with public ID {} deleted from Cloudinary", publicId);
+        } catch (Exception e) {
+            log.error("Failed to delete media with public ID {} from Cloudinary: {}", publicId, e.getMessage());
+        }
     }
 }

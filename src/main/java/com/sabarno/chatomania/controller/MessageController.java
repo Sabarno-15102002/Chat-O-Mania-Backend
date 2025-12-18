@@ -5,9 +5,11 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,9 +32,11 @@ import com.sabarno.chatomania.service.UserService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/messages")
+@Slf4j
 @Tag(name = "Message Controller", description = "APIs for managing messages within chats")
 public class MessageController {
 
@@ -43,11 +47,14 @@ public class MessageController {
     private UserService userService;
 
     @Operation(summary = "Send a new message", description = "Sends a new message within a chat")
-    @PostMapping("/create")
-    public ResponseEntity<Message> sendMessage(@RequestBody SendMessageRequest request,
+    @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Message> sendMessage(@ModelAttribute SendMessageRequest request,
             @RequestHeader("Authorization") String token) throws UserException, ChatException {
         User user = userService.findUserProfile(token);
         request.setUserId(user.getId());
+        log.info("File name: {}",request.getFile() != null ? request.getFile().getOriginalFilename() : "NO FILE");
+        System.out.println("File name: " + (request.getFile() != null ? request.getFile().getOriginalFilename() : "NO FILE"));
+
         Message message = messageService.sendMessage(request);
         return new ResponseEntity<>(message, HttpStatus.ACCEPTED);
     }
@@ -65,9 +72,8 @@ public class MessageController {
     @Operation(summary = "Mark messages as seen", description = "Marks all messages in a chat as seen by the user")
     @PutMapping("/{chatId}/seen")
     public ResponseEntity<ApiResponse> markSeen(
-        @PathVariable UUID chatId,
-        @RequestHeader("Authorization") String token
-    ) throws ChatException, UserException{
+            @PathVariable UUID chatId,
+            @RequestHeader("Authorization") String token) throws ChatException, UserException {
         User user = userService.findUserProfile(token);
         messageService.setMessageToSeen(chatId, user);
 
