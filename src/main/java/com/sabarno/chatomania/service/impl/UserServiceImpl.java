@@ -1,5 +1,6 @@
 package com.sabarno.chatomania.service.impl;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -60,7 +61,7 @@ public class UserServiceImpl implements UserService{
     }
 
     @Override
-    public User findUserByEmail(String email) {
+    public User findUserByEmail(String email){
         return userRepository.findByEmail(email);
     }
 
@@ -80,4 +81,10 @@ public class UserServiceImpl implements UserService{
         return userRepository.save(user);
     }
 
+    @Override
+    public User updateLastSeen(UUID userId) throws UserException{
+        User user = findUserById(userId);
+        user.setLastSeen(LocalDateTime.now());
+        return userRepository.save(user);
+    }
 }

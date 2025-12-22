@@ -15,6 +15,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer{
     @Autowired
     private WebSocketRateInterceptor webSocketRateInterceptor;
 
+    @Autowired
+    private WebSocketAuthInterceptor webSocketAuthInterceptor;
+
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         registry.setApplicationDestinationPrefixes("/app");
@@ -29,7 +32,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer{
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(webSocketRateInterceptor);
+        registration.interceptors(webSocketRateInterceptor, webSocketAuthInterceptor);
     }
 
 }

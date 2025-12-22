@@ -18,11 +18,11 @@ public class NotificationServiceImpl implements NotificationService {
     private SimpMessagingTemplate messagingTemplate;
 
     @Override
-    public void sendNotificationToUser(UUID senderId, UUID chatId, Object payload) {
-        log.info("Sending notification {} to user: {} in chat{}", payload, senderId, chatId);
+    public void sendNotificationToUser(UUID receiverId, UUID chatId, Object payload) {
+        log.info("Sending notification {} to user: {} in chat{}", payload, receiverId, chatId);
         messagingTemplate.convertAndSendToUser(
-                senderId.toString(),
-                "/user/" + chatId.toString(),
+                receiverId.toString(),
+                chatId.toString(),
                 payload);
     }
 
@@ -34,4 +34,12 @@ public class NotificationServiceImpl implements NotificationService {
                 payload);
     }
 
+    @Override
+    public void syncOfflineMessage(UUID userId, UUID chatId, Object payload) {
+        log.info("Syncing offline messages {} to user: {} in chat{}", payload, userId, chatId);
+        messagingTemplate.convertAndSendToUser(
+                userId.toString(),
+                "/queue/messages/" + chatId.toString(),
+                payload);
+    }
 }

@@ -33,6 +33,7 @@ public class Message {
     @Column(columnDefinition = "TEXT")
     private String content;
 
+    @Column(nullable = false)
     private LocalDateTime timestamp;
 
     @ManyToOne
@@ -52,6 +53,9 @@ public class Message {
     @Enumerated(EnumType.STRING)
     private MessageType type;
 
+    @ElementCollection
+    private Set<SeenInfo> deliveredTo = new HashSet<>();
+    
     @ElementCollection
     private Set<SeenInfo> seenBy = new HashSet<>();
 

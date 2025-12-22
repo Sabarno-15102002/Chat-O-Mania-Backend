@@ -24,6 +24,7 @@ import com.sabarno.chatomania.entity.User;
 import com.sabarno.chatomania.exception.ChatException;
 import com.sabarno.chatomania.exception.MessageException;
 import com.sabarno.chatomania.exception.UserException;
+import com.sabarno.chatomania.request.DeliveredAckRequest;
 import com.sabarno.chatomania.request.EditMessageRequest;
 import com.sabarno.chatomania.request.SendMessageRequest;
 import com.sabarno.chatomania.response.ApiResponse;
@@ -105,4 +106,19 @@ public class MessageController {
         res.setMessage("Message Deleted Successfully");
         return new ResponseEntity<>(res, HttpStatus.OK);
     }
+
+    @Operation(summary = "Acknowledge message delivery", description = "Acknowledges the delivery of a message to the user")
+    @PostMapping("/messages/delivered")
+    public ResponseEntity<ApiResponse> delivered(
+        @RequestBody DeliveredAckRequest req, 
+        @RequestHeader("Authorization") String token
+    ) throws UserException {
+        User user = userService.findUserProfile(token);
+        req.setUserId(user.getId());
+        messageService.acknowledgeDelivery(req);
+        ApiResponse res = new ApiResponse();
+        res.setMessage("Acknowledged Successfully");
+        return new ResponseEntity<>(res, HttpStatus.OK);
+    }
+
 }

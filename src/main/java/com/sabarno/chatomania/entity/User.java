@@ -1,5 +1,6 @@
 package com.sabarno.chatomania.entity;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sabarno.chatomania.utility.AuthProvider;
@@ -30,4 +31,8 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     private AuthProvider authProvider;
+
+    private Boolean isOnline;
+    
+    private LocalDateTime lastSeen;
 }

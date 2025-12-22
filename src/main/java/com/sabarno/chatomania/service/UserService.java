@@ -16,4 +16,5 @@ public interface UserService {
     public List<User> searchUser(String query);
     public User createUser(User user);
     public User createOAuthUser(String email, String name, String profilePicture);
+    public User updateLastSeen(UUID userId) throws UserException;
 }

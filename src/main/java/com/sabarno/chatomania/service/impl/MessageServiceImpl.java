@@ -23,6 +23,7 @@ import com.sabarno.chatomania.exception.MessageException;
 import com.sabarno.chatomania.exception.UserException;
 import com.sabarno.chatomania.repository.MediaRepository;
 import com.sabarno.chatomania.repository.MessageRepository;
+import com.sabarno.chatomania.request.DeliveredAckRequest;
 import com.sabarno.chatomania.request.SendMessageRequest;
 import com.sabarno.chatomania.response.CloudinaryUploadResponse;
 import com.sabarno.chatomania.service.ChatService;
@@ -117,8 +118,10 @@ public class MessageServiceImpl implements MessageService {
                 if (!participant.getId().equals(user.getId())) {
                     notification.setReceiverId(participant.getId());
                 }
+                if(participant.getIsOnline() == true){
+                    notificationService.sendNotificationToUser(participant.getId(), chat.getId(), notification);
+                }
             });
-            notificationService.sendNotificationToUser(user.getId(), chat.getId(), notification);
             return message;
         }
 
@@ -167,7 +170,11 @@ public class MessageServiceImpl implements MessageService {
             if (message.getChat().isGroup()) {
                 notificationService.sendNotificationToGroup(messageId, event);
             } else {
-                notificationService.sendNotificationToUser(reqUser.getId(), messageId, event);
+                message.getChat().getParticipants().forEach(participant -> {
+                    if (!participant.getId().equals(reqUser.getId()) && participant.getIsOnline() == true) {
+                        notificationService.sendNotificationToUser(participant.getId(), messageId, event);
+                    }
+                });
             }
         }
         throw new MessageException("User cannot delete this message");
@@ -208,11 +215,58 @@ public class MessageServiceImpl implements MessageService {
             if (message.getChat().isGroup()) {
                 notificationService.sendNotificationToGroup(messageId, event);
             } else {
-                notificationService.sendNotificationToUser(reqUser.getId(), messageId, event);
+                message.getChat().getParticipants().forEach(participant -> {
+                    if (!participant.getId().equals(reqUser.getId()) && participant.getIsOnline() == true) {
+                        notificationService.sendNotificationToUser(participant.getId(), messageId, event);
+                    }
+                });
             }
             return message;
         }
         throw new MessageException("User cannot edit this message");
+    }
+
+    @Override
+    public void acknowledgeDelivery(DeliveredAckRequest req) {
+
+        Message msg = messageRepository.findById(req.getMessageId()).orElseThrow();
+
+        if (msg.getDeliveredTo().stream()
+              .anyMatch(d -> d.getUserId().equals(req.getUserId()))) {
+            return; // idempotent
+        }
+
+        SeenInfo info = new SeenInfo();
+        info.setUserId(req.getUserId());
+        info.setTimestamp(LocalDateTime.now());
+        msg.getDeliveredTo().add(info);
+
+        msg.setState(MessageState.DELIVERED);
+
+        messageRepository.save(msg);
+    }
+
+    @Override
+    public void syncOfflineMessage(UUID userId) throws UserException {
+
+        User user = userService.findUserById(userId);
+
+        LocalDateTime lastSync =
+            user.getLastSeen() == null
+            ? LocalDateTime.MIN
+            : user.getLastSeen();
+
+        List<Message> messages =
+            messageRepository.findMessagesForOfflineSync(userId, lastSync);
+
+        for (Message msg : messages) {
+            notificationService.syncOfflineMessage(
+                userId,
+                msg.getChat().getId(),
+                msg);
+        }
+
+        userService.updateLastSeen(userId);
     }
 
     private void setMessageToSeenForGroup(UUID chatId, UUID userId) {
@@ -229,6 +283,7 @@ public class MessageServiceImpl implements MessageService {
             info.setTimestamp(now);
 
             message.getSeenBy().add(info);
+            message.setState(MessageState.SEEN);
         }
 
         messageRepository.saveAll(unreadMessages);
@@ -244,7 +299,23 @@ public class MessageServiceImpl implements MessageService {
 
     private void setMessaageToSeenForChat(Chat chat, UUID recipientId, User reqUser) {
 
-        messageRepository.setMessagesToSeenByChatId(chat.getId(), MessageState.SEEN);
+        List<Message> unreadMessages = messageRepository.findUnreadMessagesForUser(chat.getId(), reqUser.getId());
+
+        if (unreadMessages.isEmpty())
+            return;
+
+        LocalDateTime now = LocalDateTime.now();
+
+        for (Message message : unreadMessages) {
+            SeenInfo info = new SeenInfo();
+            info.setUserId(recipientId);
+            info.setTimestamp(now);
+
+            message.getSeenBy().add(info);
+            message.setState(MessageState.SEEN);
+        }
+
+        messageRepository.saveAll(unreadMessages);
         Notification notification = new Notification();
         notification.setChatId(chat.getId());
         notification.setChatName(chat.getChatName());
