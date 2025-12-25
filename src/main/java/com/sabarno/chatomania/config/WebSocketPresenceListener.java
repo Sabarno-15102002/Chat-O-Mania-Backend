@@ -22,6 +22,9 @@ public class WebSocketPresenceListener {
     @Autowired
     private MessageService messageService;
 
+    @Autowired
+    private PresenceService presenceService;
+
     @EventListener
     public void handleConnect(SessionConnectEvent event) throws UserException {
 
@@ -31,10 +34,11 @@ public class WebSocketPresenceListener {
         if (principal == null)
             return;
 
-        UUID userId = UUID.fromString(principal.getName()); // set earlier
+        UUID userId = UUID.fromString(principal.getName());
 
         userRepository.findById(userId).ifPresent(user -> {
             user.setIsOnline(true);
+            presenceService.markOnline(userId);
             userRepository.save(user);
         });
 
@@ -55,6 +59,7 @@ public class WebSocketPresenceListener {
         userRepository.findById(userId).ifPresent(user -> {
             user.setIsOnline(false);
             user.setLastSeen(LocalDateTime.now());
+            presenceService.markOffline(userId);
             userRepository.save(user);
         });
     }

@@ -2,9 +2,12 @@ package com.sabarno.chatomania.service.impl;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import com.sabarno.chatomania.entity.Chat;
@@ -82,10 +85,12 @@ public class ChatServiceImpl implements ChatService{
         log.info("New group created by {} with name {}", reqUser.getName(), req.getGroupName());
         log.info("Created chat: {}", newGroupChat);
         chatRepository.save(newGroupChat);
+        getParticipantsFromChat(newGroupChat); // Cache participants
         return newGroupChat;
     }
 
     @Override
+    @CacheEvict(value = "chatParticipants", key = "'chat:participants:' + #chatId")
     public Chat addUserToGroup(UUID userId, UUID chatId, User reqUser) throws ChatException, UserException {
         Chat groupChat = findChatById(chatId);
         if(!groupChat.isGroup()) {
@@ -135,6 +140,7 @@ public class ChatServiceImpl implements ChatService{
     }
 
     @Override
+    @CacheEvict(value = "chatParticipants", key = "'chat:participants:' + #chatId")
     public Chat removeUserFromGroup(UUID userId, UUID chatId, User reqUser) throws ChatException, UserException {
         Chat groupChat = findChatById(chatId);
         if(!groupChat.isGroup()) {
@@ -158,5 +164,19 @@ public class ChatServiceImpl implements ChatService{
             throw new UserException("Only the creator can delete the group");
         }
         chatRepository.delete(chat);
+    }
+
+    @Override
+    public Set<User> getParticipantsList(UUID chatId, User reqUser) throws ChatException, UserException {
+        Chat chat = findChatById(chatId);
+        if(!getParticipantsFromChat(chat).contains(reqUser)) {
+            throw new UserException("User is not a participant of the chat");
+        }
+        return getParticipantsFromChat(chat);
+    }
+
+    @Cacheable(value = "chatParticipants", key = "'chat:participants:' + #chatId")
+    private Set<User> getParticipantsFromChat(Chat chat) {
+        return chat.getParticipants();
     }
 }

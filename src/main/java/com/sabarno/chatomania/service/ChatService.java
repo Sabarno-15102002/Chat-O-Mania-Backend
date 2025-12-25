@@ -1,6 +1,7 @@
 package com.sabarno.chatomania.service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.sabarno.chatomania.entity.Chat;
@@ -20,4 +21,5 @@ public interface ChatService {
     public Chat updateGroupDescription(String newDescription, UUID chatId, User reqUser) throws ChatException, UserException;
     public Chat removeUserFromGroup(UUID userId, UUID chatId, User reqUser) throws ChatException, UserException;
     public void deleteChat(UUID chatId, User reqUser) throws ChatException, UserException;
+    public Set<User> getParticipantsList(UUID chatId, User reqUser) throws ChatException, UserException;
 }
