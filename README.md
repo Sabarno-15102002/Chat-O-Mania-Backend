@@ -271,3 +271,6 @@ Software Engineer at [Airbus](https://www.airbus.com/en/about-us/our-worldwide-p
 
 [![Github](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Sabarno-15102002)
 [![Linkedin](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/sabarno-biswas-3163a61ba/)
+
+## License
+[![License](https://img.shields.io/github/license/Sabarno-15102002/Chat-O-Mania-Backend)](LICENSE)
