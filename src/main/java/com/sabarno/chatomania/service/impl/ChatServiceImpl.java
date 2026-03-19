@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +33,7 @@ public class ChatServiceImpl implements ChatService{
     private UserService userService;
 
     @Override
+    @CachePut(value="chatList", key="#reqUser.id")
     public Chat createChat(User reqUser, UUID otherUserId) throws UserException {
         User otherUser = userService.findUserById(otherUserId);
 
@@ -54,12 +56,14 @@ public class ChatServiceImpl implements ChatService{
     }
 
     @Override
+    @Cacheable(value="chat", key="#chatId")
     public Chat findChatById(UUID chatId) throws ChatException {
         Chat chat = chatRepository.findById(chatId).orElseThrow(() -> new ChatException("Chat not found"));
         return chat;
     }
 
     @Override
+    @Cacheable(value="chatList", key="#userId")
     public List<Chat> findAllChatsByUserId(UUID userId) throws UserException {
         User user = userService.findUserById(userId);
         List<Chat> chats = chatRepository.findChatsByUserId(user.getId());
@@ -67,6 +71,7 @@ public class ChatServiceImpl implements ChatService{
     }
 
     @Override
+    @CachePut(value="chatList", key="#reqUser.id")
     public Chat createGroupChat(GroupChatRequest req, User reqUser) throws UserException {
         Chat newGroupChat = new Chat();
         newGroupChat.setChatName(req.getGroupName());

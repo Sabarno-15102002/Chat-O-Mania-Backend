@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +30,7 @@ public class UserServiceImpl implements UserService{
     private JwtProvider jwtProvider;
 
     @Override
+    @Cacheable(value = "users", key = "#id")
     public User findUserById(UUID id) throws UserException {
         User user = userRepository.findById(id).orElseThrow(() -> new UserException("User Not Found with id:" + id));
         return user;
@@ -47,6 +50,7 @@ public class UserServiceImpl implements UserService{
     }
 
     @Override
+    @CacheEvict(value = "users", key = "#id")
     public User updateUser(UUID id, UpdateUserRequest request) throws UserException {
         User user = findUserById(id);
         user.setName(request.getName() != null ? request.getName() : user.getName());
