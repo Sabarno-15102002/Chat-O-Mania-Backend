@@ -1,11 +1,15 @@
 package com.sabarno.chatomania.service.impl;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,6 +19,7 @@ import com.cloudinary.Transformation;
 import com.sabarno.chatomania.entity.Chat;
 import com.sabarno.chatomania.entity.Media;
 import com.sabarno.chatomania.entity.Message;
+import com.sabarno.chatomania.entity.MessageReaction;
 import com.sabarno.chatomania.entity.Notification;
 import com.sabarno.chatomania.entity.User;
 import com.sabarno.chatomania.exception.BadRequestException;
@@ -22,6 +27,7 @@ import com.sabarno.chatomania.exception.ChatException;
 import com.sabarno.chatomania.exception.MessageException;
 import com.sabarno.chatomania.exception.UserException;
 import com.sabarno.chatomania.repository.MediaRepository;
+import com.sabarno.chatomania.repository.MessageReactionRepository;
 import com.sabarno.chatomania.repository.MessageRepository;
 import com.sabarno.chatomania.request.DeliveredAckRequest;
 import com.sabarno.chatomania.request.SendMessageRequest;
@@ -35,6 +41,7 @@ import com.sabarno.chatomania.utility.MessageEvent;
 import com.sabarno.chatomania.utility.MessageState;
 import com.sabarno.chatomania.utility.MessageType;
 import com.sabarno.chatomania.utility.NotificationType;
+import com.sabarno.chatomania.utility.ReactionType;
 import com.sabarno.chatomania.utility.SeenInfo;
 import com.sabarno.chatomania.utility.SeenUpdatePayload;
 
@@ -61,6 +68,12 @@ public class MessageServiceImpl implements MessageService {
 
     @Autowired
     private MediaRepository mediaRepository;
+
+    @Autowired
+    private MessageReactionRepository messageReactionRepository;
+
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
 
     private final String folder = "Chat_O_Mania";
     public static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024;   // 10 MB
@@ -431,5 +444,62 @@ public class MessageServiceImpl implements MessageService {
         } catch (Exception e) {
             log.error("Failed to delete media with public ID {} from Cloudinary: {}", publicId, e.getMessage());
         }
+    }
+
+    @Override
+    public void toggleReaction(UUID messageId, UUID userId, Integer reactionType) throws MessageException, UserException, BadRequestException {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new MessageException("Message Not Found with id:" + messageId));
+
+        User user = userService.findUserById(userId);
+
+        if (reactionType == null || reactionType < 0 || reactionType >= ReactionType.values().length) {
+            throw new BadRequestException("Invalid reaction type: " + reactionType);
+        }
+        ReactionType reactionEnum = ReactionType.values()[reactionType];
+        
+        Optional<MessageReaction> existingReaction = messageReactionRepository.findByMessageAndUserAndReactionType(message, user, reactionEnum);
+
+        String key = "reaction:message:" + messageId + ":" + reactionEnum.name();
+
+        if (existingReaction.isPresent()) {
+            messageReactionRepository.delete(existingReaction.get());
+            redisTemplate.opsForHash().delete(key, userId);
+        } else {
+            MessageReaction reaction = new MessageReaction();
+            reaction.setMessage(message);
+            reaction.setUser(user);
+            reaction.setReactionType(reactionEnum);
+            reaction.setCreatedAt(LocalDateTime.now());
+            messageReactionRepository.save(reaction);
+
+            redisTemplate.opsForSet().add(key,userId);
+            redisTemplate.expire(key, 10, TimeUnit.MINUTES);
+
+            Boolean groupChat = message.getChat().isGroup();
+
+            if(groupChat) {
+                notificationService.sendNotificationToGroup(message.getChat().getId(), reaction);
+            } else {
+                message.getChat().getParticipants().forEach(participant -> {
+                    if (!participant.getId().equals(userId) && participant.getIsOnline() == true) {
+                        notificationService.sendNotificationToUser(participant.getId(), message.getChat().getId(), reaction);
+                    }
+                });
+            }
+        }
+    }
+
+    @Override
+    public Map<ReactionType, Long> getReactionCounts(UUID messageId) {
+        Map<ReactionType, Long> result = new HashMap<>();
+
+        for (ReactionType type : ReactionType.values()) {
+            String key = "reaction:message:" + messageId + ":" + type.name();
+            Long count = redisTemplate.opsForSet().size(key);
+            result.put(type, count != null ? count : 0);
+        }
+
+        return result;
     }
 }

@@ -1,6 +1,7 @@
 package com.sabarno.chatomania.controller;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,10 +18,12 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sabarno.chatomania.entity.Message;
 import com.sabarno.chatomania.entity.User;
+import com.sabarno.chatomania.exception.BadRequestException;
 import com.sabarno.chatomania.exception.ChatException;
 import com.sabarno.chatomania.exception.MessageException;
 import com.sabarno.chatomania.exception.UserException;
@@ -30,6 +33,7 @@ import com.sabarno.chatomania.request.SendMessageRequest;
 import com.sabarno.chatomania.response.ApiResponse;
 import com.sabarno.chatomania.service.MessageService;
 import com.sabarno.chatomania.service.UserService;
+import com.sabarno.chatomania.utility.ReactionType;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -121,4 +125,26 @@ public class MessageController {
         return new ResponseEntity<>(res, HttpStatus.OK);
     }
 
+    @Operation(summary = "Toggle reaction on a message", description = "Adds or removes a reaction to a message based on the user's previous reaction")
+    @PostMapping("/{messageId}/reactions")
+    public ResponseEntity<ApiResponse> toggleReaction(
+        @PathVariable UUID messageId,
+        @RequestParam Integer reactionType,
+        @RequestHeader("Authorization") String token
+    ) throws UserException, MessageException, BadRequestException {
+        User user = userService.findUserProfile(token);
+        messageService.toggleReaction(messageId, user.getId(), reactionType);
+        ApiResponse res = new ApiResponse();
+        res.setMessage("Reaction Toggled Successfully");
+        return new ResponseEntity<>(res, HttpStatus.OK);
+    }
+
+    @Operation(summary = "Get reaction counts for a message", description = "Retrieves the count of each reaction type for a specific message")
+    @GetMapping("/{messageId}/reactions")
+    public ResponseEntity<Map<ReactionType, Long>> getReactionCounts(
+        @PathVariable UUID messageId
+    ) throws MessageException {
+        Map<ReactionType, Long> reactionCounts = messageService.getReactionCounts(messageId);
+        return new ResponseEntity<>(reactionCounts, HttpStatus.OK);
+    }
 }

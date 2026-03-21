@@ -1,15 +1,18 @@
 package com.sabarno.chatomania.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import com.sabarno.chatomania.entity.Message;
 import com.sabarno.chatomania.entity.User;
+import com.sabarno.chatomania.exception.BadRequestException;
 import com.sabarno.chatomania.exception.ChatException;
 import com.sabarno.chatomania.exception.MessageException;
 import com.sabarno.chatomania.exception.UserException;
 import com.sabarno.chatomania.request.DeliveredAckRequest;
 import com.sabarno.chatomania.request.SendMessageRequest;
+import com.sabarno.chatomania.utility.ReactionType;
 
 public interface MessageService {
 
@@ -21,4 +24,6 @@ public interface MessageService {
     public void setMessageToSeen(UUID chatId, User reqUser) throws ChatException;
     public void syncOfflineMessage(UUID userId) throws UserException;
     public void acknowledgeDelivery(DeliveredAckRequest req);
+    public void toggleReaction(UUID messageId, UUID userId, Integer reactionType) throws MessageException, UserException, BadRequestException;
+    public Map<ReactionType, Long> getReactionCounts(UUID messageId) throws MessageException;
 }
