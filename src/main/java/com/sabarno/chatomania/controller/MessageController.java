@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sabarno.chatomania.entity.Message;
+import com.sabarno.chatomania.entity.PinnedMessage;
 import com.sabarno.chatomania.entity.User;
 import com.sabarno.chatomania.exception.BadRequestException;
 import com.sabarno.chatomania.exception.ChatException;
@@ -37,6 +38,7 @@ import com.sabarno.chatomania.utility.ReactionType;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Min;
 import lombok.extern.slf4j.Slf4j;
 
 @RestController
@@ -146,5 +148,40 @@ public class MessageController {
     ) throws MessageException {
         Map<ReactionType, Long> reactionCounts = messageService.getReactionCounts(messageId);
         return new ResponseEntity<>(reactionCounts, HttpStatus.OK);
+    }
+
+    @Operation(summary = "Pin a message", description = "Pins a message in the chat for a specified duration")
+    @PostMapping("/{messageId}/pin")
+    public ResponseEntity<PinnedMessage> pinMessage(
+        @PathVariable UUID messageId,
+        @RequestParam(required = true) @Min(24) Long expireHour ,
+        @RequestHeader("Authorization") String token
+    ) throws UserException, MessageException, ChatException {
+        
+        User user = userService.findUserProfile(token);
+        PinnedMessage pinnedMessage = messageService.pinMessage(messageId, user, expireHour);
+        return new ResponseEntity<>(pinnedMessage, HttpStatus.OK);
+    }
+
+    @Operation(summary = "Unpin a message", description = "Unpins a previously pinned message from the chat")
+    @PostMapping("/{messageId}/unpin")
+    public ResponseEntity<ApiResponse> unpinMessage(
+        @PathVariable UUID messageId,
+        @RequestHeader("Authorization") String token
+    ) throws UserException, MessageException, ChatException {
+        User user = userService.findUserProfile(token);
+        messageService.unpinMessage(messageId, user);
+        ApiResponse res = new ApiResponse();
+        res.setMessage("Message Unpinned Successfully");
+        return new ResponseEntity<>(res, HttpStatus.OK);
+    }
+
+    @Operation(summary = "Get pinned messages of a chat", description = "Retrieves all currently pinned messages within a specific chat")
+    @GetMapping("/chat/{chatId}/pinned")
+    public ResponseEntity<List<Message>> getPinnedMessages(
+        @PathVariable UUID chatId
+    ) throws ChatException {
+        List<Message> pinnedMessages = messageService.getPinnedMessages(chatId);
+        return new ResponseEntity<>(pinnedMessages, HttpStatus.OK);
     }
 }

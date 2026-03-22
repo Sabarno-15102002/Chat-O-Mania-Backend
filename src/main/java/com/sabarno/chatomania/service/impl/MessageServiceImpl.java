@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -21,6 +22,7 @@ import com.sabarno.chatomania.entity.Media;
 import com.sabarno.chatomania.entity.Message;
 import com.sabarno.chatomania.entity.MessageReaction;
 import com.sabarno.chatomania.entity.Notification;
+import com.sabarno.chatomania.entity.PinnedMessage;
 import com.sabarno.chatomania.entity.User;
 import com.sabarno.chatomania.exception.BadRequestException;
 import com.sabarno.chatomania.exception.ChatException;
@@ -29,6 +31,7 @@ import com.sabarno.chatomania.exception.UserException;
 import com.sabarno.chatomania.repository.MediaRepository;
 import com.sabarno.chatomania.repository.MessageReactionRepository;
 import com.sabarno.chatomania.repository.MessageRepository;
+import com.sabarno.chatomania.repository.PinnedMessageRepository;
 import com.sabarno.chatomania.request.DeliveredAckRequest;
 import com.sabarno.chatomania.request.SendMessageRequest;
 import com.sabarno.chatomania.response.CloudinaryUploadResponse;
@@ -71,6 +74,9 @@ public class MessageServiceImpl implements MessageService {
 
     @Autowired
     private MessageReactionRepository messageReactionRepository;
+
+    @Autowired
+    private PinnedMessageRepository pinnedMessageRepository;
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -501,5 +507,105 @@ public class MessageServiceImpl implements MessageService {
         }
 
         return result;
+    }
+
+    @Override
+    public List<Message> getPinnedMessages(UUID chatId) {
+        List<PinnedMessage> pinnedMessages = pinnedMessageRepository.findByChatId(chatId);
+        List<Message> messages = pinnedMessages.stream()
+                .map(p -> {
+                    try {
+                        return findMessageById(p.getMessageId());
+                    } catch (MessageException e) {
+                        log.error("Pinned message with id {} not found: {}", p.getMessageId(), e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(m -> m != null)
+                .collect(Collectors.toList());
+        return messages;
+    }
+
+    @Override
+    public PinnedMessage pinMessage(UUID messageId, User reqUser, Long expireHour) throws ChatException, MessageException, UserException {
+        Message message = findMessageById(messageId);
+        Chat chat = message.getChat();
+
+        if (!chat.getParticipants().contains(reqUser)) {
+            throw new ChatException("Chat is not accesible to User");
+        }
+
+        if(chat.isGroup() && !chat.getAdmins().contains(reqUser)) {
+            throw new UserException("Only admins can pin messages in a group chat");
+        }
+
+        if(pinnedMessageRepository.findByChatId(messageId).size() >= 5) {
+            throw new ChatException("Maximum pinned messages limit reached for this chat");
+        }
+
+        Optional<PinnedMessage> existing =
+                pinnedMessageRepository.findByChatIdAndMessageId(chat.getId(), messageId);
+
+        if (existing.isPresent()) {
+            throw new MessageException("Already pinned");
+        }
+
+        PinnedMessage pinned = new PinnedMessage();
+        pinned.setChatId(chat.getId());
+        pinned.setMessageId(messageId);
+        pinned.setPinnedBy(reqUser.getId());
+        pinned.setPinnedAt(LocalDateTime.now());
+        pinned.setExpireHour(expireHour);
+
+        pinnedMessageRepository.save(pinned);
+
+        String key = "chat:" + chat.getId() + ":pinned";
+        redisTemplate.opsForSet().add(key, messageId);
+        redisTemplate.expire(key, expireHour, TimeUnit.HOURS);
+
+        if(chat.isGroup()) {
+            notificationService.sendNotificationToGroup(message.getChat().getId(), pinned);
+        } else {
+            message.getChat().getParticipants().forEach(participant -> {
+                if (!participant.getId().equals(reqUser.getId()) && participant.getIsOnline() == true) {
+                    notificationService.sendNotificationToUser(participant.getId(), message.getChat().getId(), pinned);
+                }
+            });
+        }
+        return pinned;
+    }
+
+    @Override
+    public void unpinMessage(UUID messageId, User reqUser) throws ChatException, MessageException, UserException {
+        Message message = findMessageById(messageId);
+        Chat chat = message.getChat();
+
+        if (!chat.getParticipants().contains(reqUser)) {
+            throw new ChatException("Chat is not accesible to User");
+        }
+
+        if(chat.isGroup() && !chat.getAdmins().contains(reqUser)) {
+            throw new UserException("Only admins can unpin messages in a group chat");
+        }
+
+        PinnedMessage pinned = pinnedMessageRepository.findByChatIdAndMessageId(chat.getId(), messageId)
+                .orElseThrow(() -> new MessageException("Message is not pinned"));
+
+        pinnedMessageRepository.delete(pinned);
+
+        String key = "chat:" + chat.getId() + ":pinned";
+        redisTemplate.opsForSet().remove(key, messageId);
+
+        String response = "Message " + message.getContent()+ " with id " + messageId + " has been unpinned";
+
+        if(chat.isGroup()) {
+            notificationService.sendNotificationToGroup(message.getChat().getId(), response);
+        } else {
+            message.getChat().getParticipants().forEach(participant -> {
+                if (!participant.getId().equals(reqUser.getId()) && participant.getIsOnline() == true) {
+                    notificationService.sendNotificationToUser(participant.getId(), message.getChat().getId(), response);
+                }
+            });
+        }
     }
 }

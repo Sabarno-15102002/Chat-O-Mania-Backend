@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.sabarno.chatomania.entity.Message;
+import com.sabarno.chatomania.entity.PinnedMessage;
 import com.sabarno.chatomania.entity.User;
 import com.sabarno.chatomania.exception.BadRequestException;
 import com.sabarno.chatomania.exception.ChatException;
@@ -26,4 +27,7 @@ public interface MessageService {
     public void acknowledgeDelivery(DeliveredAckRequest req);
     public void toggleReaction(UUID messageId, UUID userId, Integer reactionType) throws MessageException, UserException, BadRequestException;
     public Map<ReactionType, Long> getReactionCounts(UUID messageId) throws MessageException;
+    public PinnedMessage pinMessage(UUID messageId, User reqUser, Long expireHour) throws ChatException, MessageException, UserException;
+    public void unpinMessage(UUID messageId, User reqUser) throws ChatException, MessageException, UserException;
+    public List<Message> getPinnedMessages(UUID chatId);
 }
