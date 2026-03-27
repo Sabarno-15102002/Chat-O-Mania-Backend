@@ -30,4 +30,5 @@ public interface MessageService {
     public PinnedMessage pinMessage(UUID messageId, User reqUser, Long expireHour) throws ChatException, MessageException, UserException;
     public void unpinMessage(UUID messageId, User reqUser) throws ChatException, MessageException, UserException;
     public List<Message> getPinnedMessages(UUID chatId);
+    public Message scheduleMessage(SendMessageRequest request) throws UserException, ChatException;
 }

@@ -1,5 +1,6 @@
 package com.sabarno.chatomania.request;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -13,4 +14,5 @@ public class SendMessageRequest {
     private UUID userId;
     private String content;
     private MultipartFile file;
+    private LocalDateTime scheduledTime;
 }

@@ -53,6 +53,15 @@ public class Message {
     @Enumerated(EnumType.STRING)
     private MessageType type;
 
+    @Column(nullable = false)
+    private int retryCount = 0;
+
+    @Column(nullable = true)
+    private LocalDateTime lastAttemptedAt;
+
+    @Column(nullable = true)
+    private LocalDateTime scheduledTime;
+
     @ElementCollection
     private Set<SeenInfo> deliveredTo = new HashSet<>();
     

@@ -30,4 +30,15 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     @Query("SELECT DISTINCT m FROM Message m JOIN m.chat c JOIN c.participants p WHERE p.id = :userId AND m.timestamp > :lastSync ORDER BY m.timestamp")
     List<Message> findMessagesForOfflineSync(UUID userId, LocalDateTime lastSync);
 
+    @Query("SELECT m FROM Message m WHERE m.state = :status AND m.scheduledTime <= :scheduledAt")
+    List<Message> findByStatusAndScheduledAtBefore(MessageState status, LocalDateTime scheduledAt);
+
+    @Modifying
+    @Query("""
+    UPDATE Message m
+    SET m.state = 'PROCESSING'
+    WHERE m.id = :id AND m.state = 'SCHEDULED'
+    """)
+    int lockMessage(UUID id);
+
 }

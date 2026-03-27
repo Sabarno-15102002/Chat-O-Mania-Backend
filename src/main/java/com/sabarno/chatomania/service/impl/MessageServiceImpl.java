@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -86,6 +87,7 @@ public class MessageServiceImpl implements MessageService {
     public static final long MAX_AUDIO_SIZE = 20 * 1024 * 1024;   // 20 MB
     public static final long MAX_DOCUMENT_SIZE = 30 * 1024 * 1024;   // 30 MB
     public static final long MAX_VIDEO_SIZE = 200 * 1024 * 1024;  // 200 MB
+    
     @Override
     @Transactional
     public Message sendMessage(SendMessageRequest request) throws ChatException, UserException {
@@ -608,4 +610,169 @@ public class MessageServiceImpl implements MessageService {
             });
         }
     }
+
+    @Scheduled(cron = "0 0 * * * *") //runs every hour
+    public void checkAndExpirePinnedMessages() {
+        List<PinnedMessage> allPinned = pinnedMessageRepository.findAll();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (PinnedMessage pinned : allPinned) {
+            if (pinned.getExpireHour() != null) {
+                LocalDateTime expireTime = pinned.getPinnedAt().plusHours(pinned.getExpireHour());
+                if (now.isAfter(expireTime)) {
+                    try {
+                        unpinMessage(pinned.getMessageId(), userService.findUserById(pinned.getPinnedBy()));
+                    } catch (Exception e) {
+                        log.error("Failed to expire pinned message with id {}: {}", pinned.getMessageId(), e.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public Message scheduleMessage(SendMessageRequest request) throws UserException, ChatException {
+        User user = userService.findUserById(request.getUserId());
+        Chat chat = chatService.findChatById(request.getChatId());
+
+        Message message = new Message();
+        message.setChat(chat);
+        message.setSender(user);
+        message.setContent(request.getContent());
+        message.setState(MessageState.SCHEDULED);
+        message.setScheduledTime(request.getScheduledTime());
+        CloudinaryUploadResponse uploadResponse = null;
+        if (request.getFile() == null) {
+            message.setType(MessageType.TEXT);
+            log.info("No media file attached with the message from user {}", user.getName());
+        } else {
+            uploadResponse = upload(request.getFile());
+            message.setType(uploadResponse.getMessageType());
+            Media media = new Media();
+            media.setUrl(uploadResponse.getUrl());
+            media.setPublicId(uploadResponse.getPublicId());
+            media.setType(uploadResponse.getMessageType());
+            media.setSize(uploadResponse.getSize());
+            if (uploadResponse.getMessageType() == MessageType.VIDEO) {
+                media.setDuration(uploadResponse.getDuration());
+                media.setThumbnailUrl(uploadResponse.getThumbnail());
+            } else if (uploadResponse.getMessageType() == MessageType.AUDIO) {
+                media.setDuration(uploadResponse.getDuration());
+            }
+            media = mediaRepository.save(media);
+            message.setMedia(media);
+            log.info("Media file uploaded to Cloudinary with URL: {}", uploadResponse.getUrl());
+        }
+        log.info("User {} is sending message to chat {}", user.getName(), chat.getChatName());
+
+        return messageRepository.save(message);
+    }
+
+    private void sendScheduledMessage(Message message) {
+
+        Notification notification = new Notification();
+        notification.setChatId(message.getChat().getId());
+        notification.setContent(message.getContent());
+        notification.setType(NotificationType.MESSAGE);
+        notification.setMessageType(message.getType());
+        notification.setSenderId(message.getSender().getId());
+        notification.setChatName(message.getChat().getChatName());
+
+        notification.setResponse(new CloudinaryUploadResponse(
+            message.getMedia() != null ? message.getMedia().getUrl() : null,
+            message.getMedia() != null ? message.getMedia().getPublicId() : null,
+            message.getMedia() != null ? message.getMedia().getType().toString() : null,
+            message.getMedia() != null ? message.getMedia().getSize() : null,
+            message.getType(),
+            message.getMedia() != null && message.getMedia().getThumbnailUrl() != null ? message.getMedia().getThumbnailUrl() : null,
+            message.getMedia() != null && message.getMedia().getDuration() != null ? message.getMedia().getDuration() : null
+        ));
+
+        if (!message.getChat().isGroup()) {
+            message.getChat().getParticipants().forEach(participant -> {
+                if (!participant.getId().equals(message.getSender().getId())) {
+                    notification.setReceiverId(participant.getId());
+                }
+                if (participant.getIsOnline()) {
+                    notificationService.sendNotificationToUser(
+                        participant.getId(),
+                        message.getChat().getId(),
+                        notification
+                    );
+                }
+            });
+        }
+
+        notificationService.sendNotificationToGroup(
+            message.getChat().getId(),
+            notification
+        );
+    }
+
+    private void handleFailure(Message message, Exception e) {
+
+        int retryCount = message.getRetryCount() + 1;
+        message.setRetryCount(retryCount);
+        message.setLastAttemptedAt(LocalDateTime.now());
+
+        if (retryCount >= 3) {
+            // FINAL FAILURE
+            message.setState(MessageState.FAILED);
+        } else {
+            // RETRY
+            message.setState(MessageState.SCHEDULED);
+            message.setScheduledTime(nextRetryTime(retryCount));
+        }
+
+        messageRepository.save(message);
+
+        log.error("Scheduled message failed. ID: {}, Retry: {}",
+                message.getId(), retryCount, e);
+    }
+
+    private LocalDateTime nextRetryTime(int retryCount) {
+
+        long delaySeconds = (long) Math.pow(2, retryCount) * 10;
+        return LocalDateTime.now().plusSeconds(delaySeconds);
+    }
+    @Scheduled(cron = "0 * * * * *") //runs every minute
+    public void checkAndSendScheduledMessages() throws ChatException, UserException {
+        List<Message> scheduledMessages = messageRepository.findByStatusAndScheduledAtBefore(MessageState.SCHEDULED, LocalDateTime.now());
+
+        for (Message message : scheduledMessages) {
+            
+            if (messageRepository.lockMessage(message.getId()) == 0) {
+                continue; // Another instance is processing this message
+            }
+            try {
+                message.setLastAttemptedAt(LocalDateTime.now());
+                messageRepository.save(message);
+    
+                sendScheduledMessage(message);
+    
+                message.setState(MessageState.SENT);
+                messageRepository.save(message);
+                
+            } catch (Exception e) {
+                handleFailure(message, e);
+            }
+
+        }
+    }
+
+    @Scheduled(fixedRate = 60000)
+    public void recoverStuckMessages() {
+
+        List<Message> stuck =
+            messageRepository.findByStatusAndScheduledAtBefore(
+                MessageState.PROCESSING,
+                LocalDateTime.now().minusMinutes(5)
+            );
+
+        for (Message msg : stuck) {
+            msg.setState(MessageState.SCHEDULED);
+            messageRepository.save(msg);
+        }
+    }
+
 }
